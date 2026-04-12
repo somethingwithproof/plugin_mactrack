@@ -1,6 +1,4 @@
 <?php
-
-declare(strict_types=1);
 /*
  +-------------------------------------------------------------------------+
  | Copyright (C) 2004-2026 The Cacti Group                                 |
@@ -90,11 +88,9 @@ function form_actions() {
 
 	// if we are to save this form, instead of display it
 	if (isset_request_var('selected_items')) {
-		$selected_items = sanitize_unserialize_selected_items(get_nfilter_request_var("selected_items"));
-
+		$selected_items = sanitize_unserialize_selected_items(get_nfilter_request_var('selected_items'));
 		if (!is_array($selected_items)) {
-			header('Location: mactrack_view_macs.php');
-			exit;
+			$selected_items = [];
 		}
 
 		foreach ($selected_items as $mac=>$ip) {
@@ -686,7 +682,13 @@ function mactrack_view_macs() {
 
 	$sql_where = '';
 
-	$rows = plugin_get_rows_per_page();
+	if (get_request_var('rows') == -1) {
+		$rows = read_config_option('num_rows_table');
+	} elseif (get_request_var('rows') == -2) {
+		$rows = 999999;
+	} else {
+		$rows = get_request_var('rows');
+	}
 
 	$port_results = mactrack_view_get_mac_records($sql_where, $rows, true);
 
@@ -891,7 +893,13 @@ function mactrack_view_aggregated_macs() {
 
 	$sql_where = '';
 
-	$rows = plugin_get_rows_per_page();
+	if (get_request_var('rows') == -1) {
+		$rows = read_config_option('num_rows_table');
+	} elseif (get_request_var('rows') == -2) {
+		$rows = 999999;
+	} else {
+		$rows = get_request_var('rows');
+	}
 
 	$port_results = mactrack_view_get_mac_records($sql_where, $rows, true);
 
@@ -1101,7 +1109,7 @@ function mactrack_mac_filter() {
 						<?php print __('Search', 'mactrack'); ?>
 					</td>
 					<td>
-						<input type='text' id='filter' size='25' value='<?php print html_escape_request_var('filter'); ?>'>
+						<input type='text' id='filter' size='25' value='<?php print html_escape(get_request_var('filter')); ?>'>
 					</td>
 					<td>
 						<?php print __('Site', 'mactrack'); ?>
@@ -1118,7 +1126,7 @@ function mactrack_mac_filter() {
 
 			if (get_request_var('site_id') == $site['site_id']) {
 				print ' selected';
-			} print '>' . html_escape($site['site_name']) . '</option>';
+			} print '>' . $site['site_name'] . '</option>';
 		}
 	}
 	?>
@@ -1149,7 +1157,7 @@ function mactrack_mac_filter() {
 
 			if (get_request_var('device_id') == $filter_device['device_id']) {
 				print ' selected';
-			} print '>' . html_escape($filter_device['device_name'] . '(' . $filter_device['hostname'] . ')') . '</option>';
+			} print '>' . $filter_device['device_name'] . '(' . $filter_device['hostname'] . ')' . '</option>';
 		}
 	}
 	?>

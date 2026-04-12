@@ -1,6 +1,4 @@
 <?php
-
-declare(strict_types=1);
 /*
  +-------------------------------------------------------------------------+
  | Copyright (C) 2004-2026 The Cacti Group                                 |
@@ -618,7 +616,7 @@ function mactrack_filter_table() {
 
 			if (get_request_var('device_id') == $device_id) {
 				print ' selected';
-			} print '>' . html_escape($device_name) . '</option>';
+			} print '>' . $device_name . '</option>';
 		}
 	}
 	?>
@@ -650,7 +648,7 @@ function mactrack_filter_table() {
 						<?php print __('Search', 'mactrack'); ?>
 					</td>
 					<td>
-						<input type='text' id='filter' size='25' value='<?php print html_escape_request_var('filter'); ?>'>
+						<input type='text' id='filter' size='25' value='<?php print html_escape(get_request_var('filter')); ?>'>
 					</td>
 					<td>
 						<input type='checkbox' id='totals' onChange='applyFilter()' <?php print(get_request_var('totals') == 'true' ? 'checked' : ''); ?>>

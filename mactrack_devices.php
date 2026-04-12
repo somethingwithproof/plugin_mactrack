@@ -1,6 +1,4 @@
 <?php
-
-declare(strict_types=1);
 /*
  +-------------------------------------------------------------------------+
  | Copyright (C) 2004-2026 The Cacti Group                                 |
@@ -748,6 +746,7 @@ function mactrack_device_import_processor(&$devices) {
 				if (cacti_sizeof($line_array)) {
 					foreach ($line_array as $line_item) {
 						if (in_array($j, $insert_columns, true)) {
+							$line_item = trim(str_replace("'", '', $line_item));
 							$line_item = trim(str_replace('"', '', $line_item));
 
 							if (!$first_column) {
@@ -760,15 +759,15 @@ function mactrack_device_import_processor(&$devices) {
 								if ($sql_where != '') {
 									switch($j) {
 										case $save_site_id_id:
-											$sql_where .= ' AND site_id=' . db_qstr($line_item);
+											$sql_where .= " AND site_id='$line_item'";
 
 											break;
 										case $save_snmp_port_id:
-											$sql_where .= ' AND snmp_port=' . db_qstr($line_item);
+											$sql_where .= " AND snmp_port='$line_item'";
 
 											break;
 										case $save_host_id:
-											$sql_where .= ' AND hostname=' . db_qstr($line_item);
+											$sql_where .= " AND hostname='$line_item'";
 
 											break;
 										default:
@@ -777,15 +776,15 @@ function mactrack_device_import_processor(&$devices) {
 								} else {
 									switch($j) {
 										case $save_site_id_id:
-											$sql_where .= 'WHERE site_id=' . db_qstr($line_item);
+											$sql_where .= "WHERE site_id='$line_item'";
 
 											break;
 										case $save_snmp_port_id:
-											$sql_where .= 'WHERE snmp_port=' . db_qstr($line_item);
+											$sql_where .= "WHERE snmp_port='$line_item'";
 
 											break;
 										case $save_host_id:
-											$sql_where .= 'WHERE hostname=' . db_qstr($line_item);
+											$sql_where .= "WHERE hostname='$line_item'";
 
 											break;
 										default:
@@ -810,7 +809,7 @@ function mactrack_device_import_processor(&$devices) {
 								$device_name = $line_item;
 							}
 
-							$save_value .= db_qstr($line_item);
+							$save_value .= "'" . $line_item . "'";
 						}
 
 						$j++;
@@ -936,10 +935,10 @@ function mactrack_device_edit() {
 			$snmp_objid = str_replace('OID: ', '', $snmp_objid);
 			$snmp_objid = str_replace('.iso', '.1', $snmp_objid);
 
-			print '<strong>' . __('System:', 'mactrack') . '</strong> ' . html_escape($snmp_system) . "<br>\n";
-			print '<strong>' . __('Uptime:', 'mactrack') . '</strong> ' . html_escape($snmp_uptime) . "<br>\n";
-			print '<strong>' . __('Hostname:', 'mactrack') . '</strong> ' . html_escape($snmp_hostname) . "<br>\n";
-			print '<strong>' . __('ObjectID:', 'mactrack') . '</strong> ' . html_escape($snmp_objid) . "<br>\n";
+			print '<strong>' . __('System:', 'mactrack') . "</strong> $snmp_system<br>\n";
+			print '<strong>' . __('Uptime:', 'mactrack') . "</strong> $snmp_uptime<br>\n";
+			print '<strong>' . __('Hostname:', 'mactrack') . "</strong> $snmp_hostname<br>\n";
+			print '<strong>' . __('ObjectID:', 'mactrack') . "</strong> $snmp_objid<br>\n";
 		}
 		?>
 					</span>
@@ -962,7 +961,7 @@ function mactrack_device_edit() {
 	draw_edit_form(
 		[
 			'config' => ['no_form_tag' => true],
-			'fields' => inject_form_variables($fields_mactrack_device_edit, ($device ?? []))
+			'fields' => inject_form_variables($fields_mactrack_device_edit, (isset($device) ? $device : []))
 		]
 	);
 
@@ -974,9 +973,9 @@ function mactrack_device_edit() {
 function mactrack_get_devices(&$sql_where, $rows, $apply_limits = true) {
 	// form the 'where' clause for our main sql query
 	if (get_request_var('filter') != '') {
-		$sql_where = ($sql_where != '' ? ' AND ' : 'WHERE ') . "(mtd.hostname LIKE " . db_qstr('%' . get_request_var('filter') . '%') . "
-			OR mtd.device_name LIKE " . db_qstr('%' . get_request_var('filter') . '%') . "
-			OR mtd.notes LIKE " . db_qstr('%' . get_request_var('filter') . '%') . ")";
+		$sql_where = ($sql_where != '' ? ' AND ' : 'WHERE ') . "(mtd.hostname like '%" . get_request_var('filter') . "%'
+			OR mtd.device_name like '%" . get_request_var('filter') . "%'
+			OR mtd.notes like '%" . get_request_var('filter') . "%')";
 	}
 
 	if (get_request_var('status') == '-1') {
@@ -1037,7 +1036,13 @@ function mactrack_device() {
 
 	mactrack_device_request_validation();
 
-	$rows = plugin_get_rows_per_page();
+	if (get_request_var('rows') == -1) {
+		$rows = read_config_option('num_rows_table');
+	} elseif (get_request_var('rows') == -2) {
+		$rows = 999999;
+	} else {
+		$rows = get_request_var('rows');
+	}
 
 	html_start_box(__('Mactrack Device Filters', 'mactrack'), '100%', '', '3', 'center', 'mactrack_devices.php?action=edit&status=' . get_request_var('status'));
 	mactrack_device_filter();
@@ -1155,7 +1160,7 @@ function mactrack_device_filter() {
 						<?php print __('Search', 'mactrack'); ?>
 					</td>
 					<td>
-						<input type='text' id='filter' size='25' value='<?php print html_escape_request_var('filter'); ?>'>
+						<input type='text' id='filter' size='25' value='<?php print html_escape(get_request_var('filter')); ?>'>
 					</td>
 					<td>
 						<?php print __('Site', 'mactrack'); ?>
