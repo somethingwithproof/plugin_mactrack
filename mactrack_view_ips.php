@@ -340,7 +340,7 @@ function mactrack_ips_filter() {
 					</td>
 				</tr>
 			</table>
-			<input type='hidden' id='page' value='<?php print get_request_var('page'); ?>'>
+			<input type='hidden' id='page' value='<?php print html_escape_request_var('page'); ?>'>
 			<input type='hidden' id='report' value='ips'>
 			</form>
 			<script type='text/javascript'>
@@ -363,11 +363,11 @@ function mactrack_ips_filter() {
 			}
 
 			$(function() {
-				$('#clear').click(function() {
+				$('#clear').on('click', function() {
 					clearFilter();
 				});
 
-				$('#export').submit(function(event) {
+				$('#export').on('submit', function(event) {
 					event.preventDefault();
 					exportRows();
 				});

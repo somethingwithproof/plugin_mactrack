@@ -105,7 +105,9 @@ function mactrack_view_export_devices() {
 
 	$xport_array = [];
 	array_push($xport_array, 'site_id, site_name, device_id, device_name, notes, ' .
-		'hostname, snmp_version, snmp_context, snmp_engine_id, ' .
+		'hostname, snmp_readstring, snmp_readstrings, snmp_version, ' .
+		'snmp_username, snmp_password, snmp_auth_protocol, snmp_priv_passphrase, ' .
+		'snmp_priv_protocol, snmp_context, snmp_engine_id, ' .
 		'snmp_port, snmp_timeout, snmp_retries, max_oids, snmp_sysName, snmp_sysLocation, ' .
 		'snmp_sysContact, snmp_sysObjectID, snmp_sysDescr, snmp_sysUptime, ' .
 		'ignorePorts, scan_type, disabled, ports_total, ports_active, ' .
@@ -117,7 +119,10 @@ function mactrack_view_export_devices() {
 			$device['site_id'] . '","' . $device['site_name'] . '","' .
 			$device['device_id'] . '","' . $device['device_name'] . '","' .
 			$device['notes'] . '","' . $device['hostname'] . '","' .
-			$device['snmp_version'] . '","' .
+			$device['snmp_readstring'] . '","' . $device['snmp_readstrings'] . '","' .
+			$device['snmp_version'] . '","' . $device['snmp_username'] . '","' .
+			$device['snmp_password'] . '","' . $device['snmp_auth_protocol'] . '","' .
+			$device['snmp_priv_passphrase'] . '","' . $device['snmp_priv_protocol'] . '","' .
 			$device['snmp_context'] . '","' . $device['snmp_engine_id'] . '","' .
 			$device['snmp_port'] . '","' . $device['snmp_timeout'] . '","' .
 			$device['snmp_retries'] . '","' . $device['max_oids'] . '","' .
@@ -422,7 +427,7 @@ function mactrack_device_filter2() {
 						<?php print __('Search', 'mactrack'); ?>
 					</td>
 					<td>
-						<input type='text' id='filter' size='25' value='<?php print html_escape(get_request_var('filter')); ?>'>
+						<input type='text' id='filter' size='25' value='<?php print html_escape_request_var('filter'); ?>'>
 					</td>
 					<td>
 						<?php print __('Site', 'mactrack'); ?>
@@ -549,7 +554,7 @@ function mactrack_device_filter2() {
 					</td>
 				</tr>
 			</table>
-			<input type='hidden' id='page' value='<?php print get_request_var('page'); ?>'>
+			<input type='hidden' id='page' value='<?php print html_escape_request_var('page'); ?>'>
 			<input type='hidden' id='report' value='devices'>
 			</form>
 			<script type='text/javascript'>
@@ -576,16 +581,16 @@ function mactrack_device_filter2() {
 			}
 
 			$(function() {
-				$('#mactrack').submit(function(event) {
+				$('#mactrack').on('submit', function(event) {
 					event.preventDefault();
 					applyFilter();
 				});
 
-				$('#clear').click(function() {
+				$('#clear').on('click', function() {
 					clearFilter();
 				});
 
-				$('#export').click(function() {
+				$('#export').on('click', function() {
 					exportRows();
 				});
 			});
