@@ -26,9 +26,7 @@ declare(strict_types=1);
 */
 
 // register this functions scanning functions
-if (!isset($mactrack_scanning_functions)) {
-	$mactrack_scanning_functions = [];
-}
+$mactrack_scanning_functions ??= [];
 array_push($mactrack_scanning_functions, 'get_linux_switch_ports');
 
 /*	get_generic_switch_ports - This is a basic function that will scan the dot1d

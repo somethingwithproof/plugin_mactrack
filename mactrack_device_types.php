@@ -891,7 +891,7 @@ function mactrack_device_type_edit() {
 	draw_edit_form(
 		[
 			'config' => ['no_form_tag' => 'true'],
-			'fields' => inject_form_variables($fields_mactrack_device_type_edit, (isset($device_type) ? $device_type : []))
+			'fields' => inject_form_variables($fields_mactrack_device_type_edit, ($device_type ?? []))
 		]
 	);
 
@@ -948,13 +948,7 @@ function mactrack_device_type() {
 
 	mactrack_device_type_request_validation();
 
-	if (get_request_var('rows') == -1) {
-		$rows = read_config_option('num_rows_table');
-	} elseif (get_request_var('rows') == -2) {
-		$rows = 999999;
-	} else {
-		$rows = get_request_var('rows');
-	}
+	$rows = plugin_get_rows_per_page();
 
 	html_start_box(__('Mactrack Device Type Filters', 'mactrack'), '100%', '', '3', 'center', 'mactrack_device_types.php?action=edit');
 	mactrack_device_type_filter();
@@ -1108,7 +1102,7 @@ function mactrack_device_type_filter() {
 
 			if (get_request_var('vendor') == $type['vendor']) {
 				print ' selected';
-			} print '>' . $type['vendor'] . '</option>';
+			} print '>' . html_escape($type['vendor']) . '</option>';
 		}
 	}
 	?>
