@@ -85,16 +85,16 @@ function api_mactrack_device_save($device_id, $host_id, $site_id, $hostname,
 }
 
 function api_mactrack_device_remove($device_id) {
-	db_execute('DELETE FROM mac_track_devices WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_aggregated_ports WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_interfaces WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_ips WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_ports WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_processes WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_processes WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_temp_ports WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_vlans WHERE device_id=' . $device_id);
-	db_execute('DELETE FROM mac_track_interface_graphs WHERE device_id=' . $device_id);
+	db_execute_prepared('DELETE FROM mac_track_devices WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_aggregated_ports WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_interfaces WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_ips WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_ports WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_processes WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_processes WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_temp_ports WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_vlans WHERE device_id=?', [$device_id]);
+	db_execute_prepared('DELETE FROM mac_track_interface_graphs WHERE device_id=?', [$device_id]);
 }
 
 function api_mactrack_site_save($site_id, $site_name, $customer_contact, $netops_contact, $facilities_contact, $site_info, $skip_vlans, $scan_vlans) {
@@ -123,15 +123,15 @@ function api_mactrack_site_save($site_id, $site_name, $customer_contact, $netops
 }
 
 function api_mactrack_site_remove($site_id) {
-	db_execute('DELETE FROM mac_track_sites WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_devices WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_aggregated_ports WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_interfaces WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_ips WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_ip_ranges WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_ports WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_temp_ports WHERE site_id=' . $site_id);
-	db_execute('DELETE FROM mac_track_vlans WHERE site_id=' . $site_id);
+	db_execute_prepared('DELETE FROM mac_track_sites WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_devices WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_aggregated_ports WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_interfaces WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_ips WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_ip_ranges WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_ports WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_temp_ports WHERE site_id=?', [$site_id]);
+	db_execute_prepared('DELETE FROM mac_track_vlans WHERE site_id=?', [$site_id]);
 }
 
 function sync_mactrack_to_cacti($mt_device) {
@@ -149,7 +149,7 @@ function sync_mactrack_to_cacti($mt_device) {
 		$mt_device['snmp_engine_id'] ??= '';
 
 		// fetch current data for cacti device
-		$cacti_device = db_fetch_row('SELECT * FROM host WHERE id=' . $mt_device['host_id']);
+		$cacti_device = db_fetch_row_prepared('SELECT * FROM host WHERE id=?', [$mt_device['host_id']]);
 
 		if (cacti_sizeof($cacti_device)) {
 			// update cacti device
@@ -178,7 +178,7 @@ function sync_cacti_to_mactrack($device) {
 	if ((read_config_option('mt_update_policy', true) == 2) && ($device['id'] > 0)) {
 		// $devices holds the whole row from host table
 		// now fetch the related device from mac_track_devices, if any
-		$mt_device = db_fetch_row('SELECT * from mac_track_devices WHERE host_id=' . $device['id']);
+		$mt_device = db_fetch_row_prepared('SELECT * from mac_track_devices WHERE host_id=?', [$device['id']]);
 
 		if (is_array($mt_device) && $mt_device) {
 			$mt_device['snmp_engine_id'] ??= '';
