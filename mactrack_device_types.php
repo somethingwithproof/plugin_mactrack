@@ -278,7 +278,7 @@ function form_actions() {
 				WHERE device_type_id = ?',
 				[$matches[1]]);
 
-			$device_types_list .= '<li>' . $device_types_info['description'] . '</li>';
+			$device_types_list .= '<li>' . html_escape($device_types_info['description']) . '</li>';
 			$device_types_array[$i] = $matches[1];
 			$i++;
 		}

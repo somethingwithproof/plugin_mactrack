@@ -120,7 +120,7 @@ function form_actions() {
 				WHERE mac_id = ?',
 				[$matches[1]]);
 
-			$macw_list .= '<li>' . $macw_info . '</li>';
+			$macw_list .= '<li>' . html_escape($macw_info) . '</li>';
 			$macw_array[$i] = $matches[1];
 			$i++;
 		}

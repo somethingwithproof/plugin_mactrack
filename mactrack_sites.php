@@ -125,7 +125,7 @@ function form_actions() {
 				WHERE site_id = ?',
 				[$matches[1]]);
 
-			$site_list .= '<li>' . $site_info . '</li>';
+			$site_list .= '<li>' . html_escape($site_info) . '</li>';
 			$site_array[$i] = $matches[1];
 			$i++;
 		}
