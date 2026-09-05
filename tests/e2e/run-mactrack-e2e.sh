@@ -17,12 +17,20 @@ trap cleanup EXIT
 cd "$SCRIPT_DIR"
 docker compose -p "$PROJECT" up -d --build
 
-for attempt in $(seq 1 36); do
+database_ready=false
+
+for _ in $(seq 1 36); do
 	if docker compose -p "$PROJECT" exec -T db mariadb-admin ping -h 127.0.0.1 -ucacti -pmactrack-test --silent; then
+		database_ready=true
 		break
 	fi
 	sleep 5
 done
+
+if [[ "$database_ready" != true ]]; then
+	echo "Mactrack test database did not become ready" >&2
+	exit 1
+fi
 
 docker compose -p "$PROJECT" exec -T web bash /var/www/html/cacti/plugins/mactrack/tests/e2e/bootstrap-mactrack.sh
 curl --fail --silent --show-error "http://localhost:${MACTRACK_E2E_PORT:-18082}/cacti/plugins/mactrack/mactrack_view_devices.php" >/dev/null

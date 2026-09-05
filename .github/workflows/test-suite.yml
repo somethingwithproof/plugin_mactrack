@@ -1,0 +1,72 @@
+# +-------------------------------------------------------------------------+
+# | Copyright (C) 2004-2026 The Cacti Group                                 |
+# +-------------------------------------------------------------------------+
+# | Cacti: The Complete RRDtool-based Graphing Solution                     |
+# +-------------------------------------------------------------------------+
+
+name: MacTrack Test Suite
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  fast-suite:
+    name: Unit and contracts (PHP ${{ matrix.php }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.1', '8.2', '8.3', '8.4']
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Run cohesive fast suite
+        run: php tests/run.php all
+
+  docker-integration:
+    name: Clean Cacti install and schema
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Cacti
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Cacti/cacti
+          ref: 1e8eaca26b84b128c39ce8cc8ece42d7ff76aac1 # release/1.2.31
+          path: cacti
+
+      - name: Checkout plugin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: cacti/plugins/mactrack
+
+      - name: Install PHP tooling
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install plugin dependencies
+        working-directory: cacti/plugins/mactrack
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run clean-install Docker suite
+        env:
+          CACTI_SOURCE: ${{ github.workspace }}/cacti
+          MACTRACK_SOURCE: ${{ github.workspace }}/cacti/plugins/mactrack
+        run: bash cacti/plugins/mactrack/tests/e2e/run-mactrack-e2e.sh

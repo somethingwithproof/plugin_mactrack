@@ -3,7 +3,7 @@ services:
     image: mariadb:10.11
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-mactrack-test-root}
-      MARIADB_DATABASE: ${DB_NAME:-cacti}
+      MARIADB_DATABASE: ${DB_NAME:-mactrack_e2e}
       MARIADB_USER: ${DB_USER:-cacti}
       MARIADB_PASSWORD: ${DB_PASSWORD:-mactrack-test}
       TZ: UTC
@@ -25,7 +25,7 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 3306
-      DB_NAME: ${DB_NAME:-cacti}
+      DB_NAME: ${DB_NAME:-mactrack_e2e}
       DB_USER: ${DB_USER:-cacti}
       DB_PASS: ${DB_PASSWORD:-mactrack-test}
       TIMEZONE: UTC

@@ -12,7 +12,7 @@ chown -R www-data:www-data "$CACTI_PATH/cache" "$CACTI_PATH/log" "$CACTI_PATH/rr
 cp "$CACTI_PATH/include/config.php.dist" "$CACTI_PATH/include/config.php"
 sed -i \
 	-e "s/\$database_hostname *=.*/\$database_hostname = 'db';/" \
-	-e "s/\$database_default *=.*/\$database_default  = 'cacti';/" \
+	-e "s/\$database_default *=.*/\$database_default  = '${DB_NAME}';/" \
 	-e "s/\$database_username *=.*/\$database_username = 'cacti';/" \
 	-e "s/\$database_password *=.*/\$database_password = 'mactrack-test';/" \
 	"$CACTI_PATH/include/config.php"
@@ -29,4 +29,20 @@ done
 
 php "$CACTI_PATH/cli/install_cacti.php" --accept-eula --install --force "${template_args[@]}"
 php "$CACTI_PATH/cli/plugin_manage.php" --plugin=mactrack --install --enable --allperms
+
+for destructive_test in mactrack_scanning_functions.php mactrack_schema_idempotency.php; do
+	if MACTRACK_E2E=1 DB_NAME=cacti php "$CACTI_PATH/plugins/mactrack/tests/e2e/$destructive_test" >/dev/null 2>&1; then
+		guard_status=0
+	else
+		guard_status=$?
+	fi
+
+	if [[ "$guard_status" -ne 2 ]]; then
+		echo "$destructive_test did not reject a non-E2E database" >&2
+		exit 1
+	fi
+done
+
+MACTRACK_E2E=1 php "$CACTI_PATH/plugins/mactrack/tests/e2e/mactrack_scanning_functions.php"
+MACTRACK_E2E=1 php "$CACTI_PATH/plugins/mactrack/tests/e2e/mactrack_schema_idempotency.php"
 php "$CACTI_PATH/plugins/mactrack/tests/e2e/mactrack_smoke.php"
