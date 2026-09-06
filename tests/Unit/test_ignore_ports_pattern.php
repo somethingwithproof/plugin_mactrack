@@ -45,6 +45,43 @@ if ($predicate !== '(ifName NOT RLIKE ? AND ifDescr NOT RLIKE ?)' || $params !==
 	$failed++;
 }
 
+$filter_expectations = [
+	'-4' => [-1 => true, 70 => true],
+	'-3' => [-1 => true, 70 => true],
+	'-2' => [-1 => false, 70 => false],
+	'-1' => [-1 => true, 70 => true],
+	'0'  => [-1 => true, 70 => true],
+	'1'  => [-1 => true, 70 => true],
+	'2'  => [-1 => true, 70 => true],
+	'3'  => [-1 => true, 70 => true],
+	'7'  => [-1 => false, 70 => false],
+	'9'  => [-1 => false, 70 => true],
+	'10' => [-1 => false, 70 => true],
+	'11' => [-1 => false, 70 => true],
+];
+
+foreach ($filter_expectations as $issues => $bandwidth_cases) {
+	foreach ($bandwidth_cases as $bwusage => $expected_ignore) {
+		$actual_ignore = mactrack_interface_filter_needs_ignore($issues, $bwusage);
+		$params        = [];
+		$sql           = '';
+
+		if ($actual_ignore) {
+			$sql = mactrack_get_ignore_ports_predicate($params);
+		}
+
+		if ($actual_ignore !== $expected_ignore || substr_count($sql, '?') !== count($params)) {
+			fwrite(STDERR, "Ignore predicate/parameter mismatch for issues=$issues bwusage=$bwusage\n");
+			$failed++;
+		}
+	}
+}
+
+if (strpos($source, "' NOT ' . \$ignore") === false) {
+	fwrite(STDERR, "The ignored-interface filter must preserve bound placeholders under NOT\n");
+	$failed++;
+}
+
 $GLOBALS['mactrack_test_config_options']['mt_ignorePorts'] = '(Vlan';
 $GLOBALS['mactrack_test_db_calls'] = [];
 

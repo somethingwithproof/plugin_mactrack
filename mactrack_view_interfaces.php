@@ -43,7 +43,7 @@ function mactrack_get_records(&$sql_where, $apply_limits = true, $rows = '30', &
 	$bwusage = intval(get_filter_request_var('bwusage'));
 	$ignore  = '';
 
-	if (in_array($issues, ['-3', '-4', '-1', '0', '1', '2', '3', '9', '10', '11'], true)) {
+	if (mactrack_interface_filter_needs_ignore($issues, $bwusage)) {
 		$ignore = mactrack_get_ignore_ports_predicate($sql_params);
 	}
 

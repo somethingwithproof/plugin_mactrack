@@ -3874,3 +3874,10 @@ function mactrack_get_ignore_ports_predicate(&$params) {
 
 	return '(ifName NOT RLIKE ? AND ifDescr NOT RLIKE ?)';
 }
+
+function mactrack_interface_filter_needs_ignore($issues, $bwusage) {
+	$issues = (string) $issues;
+
+	return in_array($issues, ['-3', '-4', '-1', '0', '1', '2', '3'], true) ||
+		(in_array($issues, ['9', '10', '11'], true) && (int) $bwusage !== -1);
+}
