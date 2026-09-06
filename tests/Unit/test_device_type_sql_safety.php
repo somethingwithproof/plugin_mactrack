@@ -79,7 +79,7 @@ if ($cabletronSource                                                            
 $interfacesSource = file_get_contents(__DIR__ . '/../../mactrack_view_interfaces.php');
 
 if ($interfacesSource                         === false ||
-	strpos($interfacesSource, 'mactrack_validate_ignore_ports_pattern($stored_match)') === false ||
+	strpos($interfacesSource, 'mactrack_get_ignore_ports_pattern()') === false ||
 	strpos($interfacesSource, 'db_qstr($match)') === false ||
 	strpos($interfacesSource, 'db_qstr_rlike') !== false ||
 	strpos($interfacesSource, "intval(get_filter_request_var('bwusage'))") === false) {
@@ -138,7 +138,7 @@ if (strpos($arpSource, 'mactrack_format_mac(') === false ||
 $resolverSource = file_get_contents(__DIR__ . '/../../mactrack_resolver.php');
 
 if ($resolverSource                                           === false ||
-	strpos($resolverSource, 'set_include_path(')                 === false ||
+	strpos($resolverSource, "'/plugins/mactrack' . PATH_SEPARATOR . get_include_path()") === false ||
 	strpos($resolverSource, 'if (is_file($dns2))')               === false ||
 	strpos($resolverSource, "class_exists('Net_DNS2_Resolver')") === false) {
 	fwrite(STDERR, "DNS resolver must reach Net_DNS2 regardless of cwd and report a missing library rather than fatal\n");

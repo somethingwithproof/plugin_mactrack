@@ -14,6 +14,10 @@ function db_execute($sql) {
 	return true;
 }
 function db_execute_prepared($sql, array $params = []) {
+	global $mactrack_test_db_calls;
+
+	$mactrack_test_db_calls[] = ['sql' => $sql, 'params' => $params];
+
 	return true;
 }
 function db_fetch_assoc($sql) {

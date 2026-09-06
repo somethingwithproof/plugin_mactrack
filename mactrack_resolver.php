@@ -44,7 +44,7 @@ include('../../include/cli_check.php');
 include_once($config['base_path'] . '/plugins/mactrack/lib/mactrack_functions.php');
 // Net_DNS2 autoloads its own classes with include paths relative to the library
 // root, so that root has to be reachable independently of the current directory.
-set_include_path(get_include_path() . PATH_SEPARATOR . $config['base_path'] . '/plugins/mactrack');
+set_include_path($config['base_path'] . '/plugins/mactrack' . PATH_SEPARATOR . get_include_path());
 
 $dns2 = $config['base_path'] . '/plugins/mactrack/Net/DNS2.php';
 

@@ -7,7 +7,7 @@
 
 require_once __DIR__ . '/../../../../include/cli_check.php';
 
-set_include_path(get_include_path() . PATH_SEPARATOR . __DIR__ . '/../..');
+set_include_path(__DIR__ . '/../..' . PATH_SEPARATOR . get_include_path());
 require_once __DIR__ . '/../../Net/DNS2.php';
 
 $status = db_fetch_cell_prepared(

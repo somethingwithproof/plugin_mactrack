@@ -3836,14 +3836,28 @@ function mactrack_validate_ignore_ports_pattern($pattern) {
 	}
 
 	// MySQL and PCRE are not identical engines, but compiling the configured
-	// expression here catches malformed delimiters/groups before it can break
-	// every Network Interfaces query. Preserve the expression itself for RLIKE.
-	$validation_pattern = '~' . str_replace('~', '\\~', $pattern) . '~';
+	// expression here catches malformed groups before they can break every
+	// Network Interfaces query. SOH cannot occur in this text setting and avoids
+	// changing valid pattern characters solely to construct a PCRE delimiter.
+	$validation_pattern = "\x01" . $pattern . "\x01";
 
-	if (@preg_match($validation_pattern, '') === false) {
+	if (strpos($pattern, "\x01") !== false || @preg_match($validation_pattern, '') === false) {
 		cacti_log('Invalid MacTrack Ports to Ignore regular expression; using the default pattern', false, 'MACTRACK');
 
 		return $default;
+	}
+
+	return $pattern;
+}
+
+function mactrack_get_ignore_ports_pattern() {
+	$stored_pattern = read_config_option('mt_ignorePorts', true);
+	$pattern        = mactrack_validate_ignore_ports_pattern($stored_pattern);
+
+	// Preserve the historical initialization of an empty setting, but never let
+	// a read-only page view overwrite a non-empty administrator-supplied value.
+	if ($stored_pattern === '') {
+		db_execute_prepared('REPLACE INTO settings SET name="mt_ignorePorts", value = ?', [$pattern]);
 	}
 
 	return $pattern;

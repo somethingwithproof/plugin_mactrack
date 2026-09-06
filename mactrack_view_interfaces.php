@@ -39,12 +39,7 @@ if (isset_request_var('export')) {
 function mactrack_get_records(&$sql_where, $apply_limits = true, $rows = '30') {
 	global $timespan, $group_function, $summary_stats;
 
-	$stored_match = read_config_option('mt_ignorePorts', true);
-	$match        = mactrack_validate_ignore_ports_pattern($stored_match);
-
-	if ($match !== $stored_match) {
-		db_execute_prepared('REPLACE INTO settings SET name="mt_ignorePorts", value = ?', [$match]);
-	}
+	$match = mactrack_get_ignore_ports_pattern();
 	// Quote the pattern but leave it intact. Cacti 1.2.14 does not provide the
 	// RLIKE helper, and newer core versions strip |, { and } to bound backtracking,
 	// which would destroy the documented default of (Vlan|Loopback|Null).
