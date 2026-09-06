@@ -39,15 +39,15 @@ if (isset_request_var('export')) {
 function mactrack_get_records(&$sql_where, $apply_limits = true, $rows = '30') {
 	global $timespan, $group_function, $summary_stats;
 
-	$match = read_config_option('mt_ignorePorts', true);
+	$stored_match = read_config_option('mt_ignorePorts', true);
+	$match        = mactrack_validate_ignore_ports_pattern($stored_match);
 
-	if ($match == '') {
-		$match = '(Vlan|Loopback|Null)';
+	if ($match !== $stored_match) {
 		db_execute_prepared('REPLACE INTO settings SET name="mt_ignorePorts", value = ?', [$match]);
 	}
-	// Quote the pattern but leave it intact.  Core's RLIKE helper strips |, { and }
-	// to bound backtracking, which would destroy the documented default of
-	// (Vlan|Loopback|Null) that this setting ships with.
+	// Quote the pattern but leave it intact. Cacti 1.2.14 does not provide the
+	// RLIKE helper, and newer core versions strip |, { and } to bound backtracking,
+	// which would destroy the documented default of (Vlan|Loopback|Null).
 	$match_sql = db_qstr($match);
 	$ignore    = '(ifName NOT RLIKE ' . $match_sql . ' AND ifDescr NOT RLIKE ' . $match_sql . ')';
 	$bwusage   = intval(get_filter_request_var('bwusage'));

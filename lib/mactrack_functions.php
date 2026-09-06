@@ -3826,3 +3826,25 @@ function mactrack_format_mac($mac) {
 	// An unset or unrecognised mt_mac_format must not blank the address out.
 	return $mac;
 }
+
+function mactrack_validate_ignore_ports_pattern($pattern) {
+	$default = '(Vlan|Loopback|Null)';
+	$pattern = is_string($pattern) ? $pattern : '';
+
+	if ($pattern === '') {
+		return $default;
+	}
+
+	// MySQL and PCRE are not identical engines, but compiling the configured
+	// expression here catches malformed delimiters/groups before it can break
+	// every Network Interfaces query. Preserve the expression itself for RLIKE.
+	$validation_pattern = '~' . str_replace('~', '\\~', $pattern) . '~';
+
+	if (@preg_match($validation_pattern, '') === false) {
+		cacti_log('Invalid MacTrack Ports to Ignore regular expression; using the default pattern', false, 'MACTRACK');
+
+		return $default;
+	}
+
+	return $pattern;
+}

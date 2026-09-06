@@ -20,6 +20,7 @@ This is a Cacti plugin. It integrates with the Cacti monitoring platform via the
   resulting type.
 
 ## Testing
-- Tests in tests/ directory
-- Use Pest PHP or PHPUnit
-- php -l lint check required before commit
+- Put executable standalone tests in `tests/Unit/` or `tests/Integration/`;
+  `.github/workflows/code-quality.yml` runs every PHP file in those directories.
+- Keep tests dependency-free so they run without Composer.
+- Run `php -l` before committing.

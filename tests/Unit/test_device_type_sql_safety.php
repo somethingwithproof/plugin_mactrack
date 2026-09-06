@@ -79,6 +79,7 @@ if ($cabletronSource                                                            
 $interfacesSource = file_get_contents(__DIR__ . '/../../mactrack_view_interfaces.php');
 
 if ($interfacesSource                         === false ||
+	strpos($interfacesSource, 'mactrack_validate_ignore_ports_pattern($stored_match)') === false ||
 	strpos($interfacesSource, 'db_qstr($match)') === false ||
 	strpos($interfacesSource, 'db_qstr_rlike') !== false ||
 	strpos($interfacesSource, "intval(get_filter_request_var('bwusage'))") === false) {
