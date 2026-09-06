@@ -2127,7 +2127,9 @@ function xform_net_address($ip_address) {
  * @param mixed $mac_address
  */
 function xform_mac_address($mac_address) {
-	$mac_address = trim((string) $mac_address);
+	// Preserve NUL octets from binary SNMP values; the default trim() mask
+	// includes "\0", which can silently drop a significant final MAC byte.
+	$mac_address = trim((string) $mac_address, " \t\n\r\x0B");
 
 	// An interface with no hardware address stores an empty string, not the
 	// placeholder the dead branch below used to build and throw away.
