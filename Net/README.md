@@ -27,6 +27,14 @@ record type.
 The 2.x line is namespaced and is not API compatible with the `Net_DNS2_*`
 class names this plugin uses, so 1.5.x is the line to track.
 
+## Local security hardening
+
+The bundled 1.5.5 cache implementation is patched locally to prevent arbitrary
+object construction from tampered file or shared-memory caches. Cache metadata
+is decoded with classes disabled. Serialized DNS response payloads use an
+explicit allowlist containing only response, header, question, and registered
+resource-record classes, and reject any other top-level result.
+
 ## Updating
 
 ```

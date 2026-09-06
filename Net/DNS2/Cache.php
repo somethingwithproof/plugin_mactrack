@@ -79,7 +79,26 @@ class Net_DNS2_Cache
             if ($this->cache_serializer == 'json') {
                 return json_decode($this->cache_data[$key]['object']);
             } else {
-                return unserialize($this->cache_data[$key]['object']);
+                // Cache payloads are response object graphs. Preserve those
+                // objects without allowing a tampered cache to instantiate
+                // arbitrary application classes.
+                $allowed_classes = array_merge(
+                    [
+                        'Net_DNS2_Packet_Response',
+                        'Net_DNS2_Header',
+                        'Net_DNS2_Question'
+                    ],
+                    array_values(Net_DNS2_Lookups::$rr_types_id_to_class)
+                );
+
+                $response = unserialize(
+                    $this->cache_data[$key]['object'],
+                    ['allowed_classes' => $allowed_classes]
+                );
+
+                return ($response instanceof Net_DNS2_Packet_Response)
+                    ? $response
+                    : false;
             }
         } else {
 
