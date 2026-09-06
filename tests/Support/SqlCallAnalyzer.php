@@ -21,9 +21,19 @@ final class MactrackSqlCallAnalyzer {
 		$tokens = token_get_all($source);
 		$token_count = count($tokens);
 		$name_tokens = [T_STRING];
+		$member_access_tokens = [T_OBJECT_OPERATOR, T_DOUBLE_COLON];
 
 		if (defined('T_NAME_FULLY_QUALIFIED')) {
 			$name_tokens[] = constant('T_NAME_FULLY_QUALIFIED');
+		}
+		if (defined('T_NAME_QUALIFIED')) {
+			$name_tokens[] = constant('T_NAME_QUALIFIED');
+		}
+		if (defined('T_NAME_RELATIVE')) {
+			$name_tokens[] = constant('T_NAME_RELATIVE');
+		}
+		if (defined('T_NULLSAFE_OBJECT_OPERATOR')) {
+			$member_access_tokens[] = constant('T_NULLSAFE_OBJECT_OPERATOR');
 		}
 
 		for ($index = 0; $index < $token_count; $index++) {
@@ -36,6 +46,16 @@ final class MactrackSqlCallAnalyzer {
 			$name = strtolower(ltrim($token[1], '\\'));
 
 			if (!preg_match('/^db_(?:execute|fetch_row|fetch_assoc|fetch_cell)(?:_prepared)?$/', $name)) {
+				continue;
+			}
+
+			$previous = $index - 1;
+
+			while ($previous >= 0 && is_array($tokens[$previous]) && in_array($tokens[$previous][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+				$previous--;
+			}
+
+			if ($previous >= 0 && is_array($tokens[$previous]) && in_array($tokens[$previous][0], $member_access_tokens, true)) {
 				continue;
 			}
 
@@ -68,6 +88,16 @@ final class MactrackSqlCallAnalyzer {
 					break;
 				} elseif ($argument_token === '.' || (is_array($argument_token) && in_array($argument_token[0], [T_VARIABLE, T_ENCAPSED_AND_WHITESPACE], true))) {
 					$is_dynamic = true;
+				} elseif (is_array($argument_token) && in_array($argument_token[0], $name_tokens, true)) {
+					$after_name = $next + 1;
+
+					while ($after_name < $token_count && is_array($tokens[$after_name]) && in_array($tokens[$after_name][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+						$after_name++;
+					}
+
+					if (($tokens[$after_name] ?? null) === '(') {
+						$is_dynamic = true;
+					}
 				}
 			}
 

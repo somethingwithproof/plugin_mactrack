@@ -728,6 +728,9 @@ function mactrack_seed_default_site(?int $lock_timeout = null): bool {
 
 	$lock_timeout = $lock_timeout ?? (PHP_SAPI === 'cli' ? 10 : 2);
 	$lock_timeout = max(0, $lock_timeout);
+	// This advisory lock improves the legacy check-then-insert behavior, but a
+	// reconnect can release it. Database-enforced name uniqueness needs the
+	// duplicate-safe legacy migration tracked in #360.
 	$lock_name = 'mactrack.default.' . sha1((string) $database_default);
 	$locked    = db_fetch_cell_prepared('SELECT GET_LOCK(?, ?)', [$lock_name, $lock_timeout]);
 

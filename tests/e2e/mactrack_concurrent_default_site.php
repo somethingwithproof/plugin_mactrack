@@ -22,7 +22,7 @@ require_once __DIR__ . '/../Support/E2eDatabaseGuard.php';
 
 global $database_default;
 
-if (!MactrackE2eDatabaseGuard::isDisposable($database_default, getenv('DB_NAME'))) {
+if (!MactrackE2eDatabaseGuard::isDisposable($database_default, getenv('MACTRACK_E2E_EXPECT_DB'))) {
 	fwrite(STDERR, "Refusing concurrent seed checks outside the dedicated mactrack_e2e database\n");
 	exit(2);
 }

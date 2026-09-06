@@ -10,12 +10,13 @@ services:
       MYSQL_DATABASE: ${DB_NAME:-mactrack_e2e}
       MYSQL_USER: ${DB_USER:-cacti}
       MYSQL_PASSWORD: ${DB_PASSWORD:-mactrack-test}
+      MYSQL_PWD: ${DB_PASSWORD:-mactrack-test}
       TZ: UTC
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u${DB_USER:-cacti} -p${DB_PASSWORD:-mactrack-test} --silent"]
+      test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 --user="$${MYSQL_USER}" --silent']
       interval: 5s
       timeout: 5s
       retries: 24

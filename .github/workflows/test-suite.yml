@@ -84,4 +84,6 @@ jobs:
           CACTI_SOURCE: ${{ github.workspace }}/cacti
           MACTRACK_SOURCE: ${{ github.workspace }}/cacti/plugins/mactrack
           DB_IMAGE: ${{ matrix.database.image }}
+          DB_USER: mactrack_ci
+          DB_PASSWORD: mactrack-ci-password
         run: bash cacti/plugins/mactrack/tests/e2e/run-mactrack-e2e.sh

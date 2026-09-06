@@ -6,6 +6,8 @@ PROJECT="mactrack_e2e_$$"
 
 : "${CACTI_SOURCE:?Set CACTI_SOURCE to a Cacti source checkout}"
 : "${MACTRACK_SOURCE:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
+: "${DB_USER:=cacti}"
+: "${DB_PASSWORD:=mactrack-test}"
 export CACTI_SOURCE MACTRACK_SOURCE
 
 cleanup() {
@@ -20,7 +22,7 @@ docker compose -p "$PROJECT" up -d --build
 database_ready=false
 
 for _ in $(seq 1 36); do
-	if docker compose -p "$PROJECT" exec -T db mysqladmin ping -h 127.0.0.1 -ucacti -pmactrack-test --silent; then
+	if docker compose -p "$PROJECT" exec -T -e MYSQL_PWD="$DB_PASSWORD" db mysqladmin ping -h 127.0.0.1 --user="$DB_USER" --silent; then
 		database_ready=true
 		break
 	fi
