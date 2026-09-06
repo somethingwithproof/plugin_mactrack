@@ -78,6 +78,8 @@ MactrackStandaloneTest::assertSame(null, mactrack_create_sql_filter('', ['hostna
 MactrackStandaloneTest::assertSame(null, mactrack_create_sql_filter('edge', []), 'a blank field list produces no SQL');
 
 $poller_source = file_get_contents(__DIR__ . '/../../poller_mactrack.php');
+MactrackStandaloneTest::assertContains("includes/database.php", $poller_source, 'the headless poller loads Default-site recovery helpers');
+MactrackStandaloneTest::assertContains('mactrack_retry_default_site();', $poller_source, 'the headless poller drives scheduled Default-site recovery');
 MactrackStandaloneTest::assertContains('$last_macauth_time + ($mac_auth_frequency * 60) < time()', $poller_source, 'MacAuth reports honor the configured frequency window');
 MactrackStandaloneTest::assertContains("set_config_option('mt_last_macauth_time', (string) time())", $poller_source, 'MacAuth report completion persists its last-run time');
 

@@ -41,7 +41,9 @@ if (getenv('MACTRACK_RUNNER_SELF_TEST') === '1') {
 
 $claimed_files = [];
 
-foreach (array_slice($groups, 0, 4) as $patterns) {
+foreach (['unit', 'integration', 'security', 'e2e-static'] as $group) {
+	$patterns = $groups[$group];
+
 	foreach ($patterns as $pattern) {
 		$matches = glob($pattern);
 
@@ -52,31 +54,24 @@ foreach (array_slice($groups, 0, 4) as $patterns) {
 }
 
 $docker_tests = [
+	__DIR__ . '/e2e/mactrack_concurrent_default_site.php',
 	__DIR__ . '/e2e/mactrack_scanning_functions.php',
 	__DIR__ . '/e2e/mactrack_schema_idempotency.php',
 	__DIR__ . '/e2e/mactrack_smoke.php',
 ];
-$auxiliary_files = [
-	__DIR__ . '/Support/CactiStubs.php',
-	__DIR__ . '/Support/CliGuard.php',
-	__DIR__ . '/Support/E2eDatabaseGuard.php',
-	__DIR__ . '/Support/Php74Scanner.php',
-	__DIR__ . '/Support/ProcessRunner.php',
-	__DIR__ . '/Support/ProductionPhpManifest.php',
-	__DIR__ . '/Support/SchemaManifest.php',
-	__DIR__ . '/Support/SqlCallAnalyzer.php',
-	__DIR__ . '/Support/StandaloneTest.php',
-	__DIR__ . '/Support/TestInventory.php',
-	__DIR__ . '/Support/TrackedPhpFiles.php',
-	__DIR__ . '/fixtures/inventory/Security/ClaimedTest.php',
-	__DIR__ . '/fixtures/inventory/Security/test_orphan.php',
-	__DIR__ . '/fixtures/inventory/Unit/OrphanTest.php',
-	__DIR__ . '/fixtures/inventory/Unit/test_claimed.php',
-	__DIR__ . '/fixtures/test_large_stderr.php',
-	__DIR__ . '/fixtures/test_noop.php',
-	__DIR__ . '/fixtures/test_silent.php',
-	__DIR__ . '/fixtures/test_warning.php',
-];
+$auxiliary_files = [];
+
+foreach ([__DIR__ . '/Support', __DIR__ . '/fixtures'] as $root) {
+	$iterator = new RecursiveIteratorIterator(
+		new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
+	);
+
+	foreach ($iterator as $file) {
+		if ($file->getExtension() === 'php') {
+			$auxiliary_files[] = $file->getPathname();
+		}
+	}
+}
 $unclaimed = MactrackTestInventory::findUnclaimed(
 	[__DIR__ . '/Unit', __DIR__ . '/Integration', __DIR__ . '/Security', __DIR__ . '/e2e', __DIR__ . '/Support', __DIR__ . '/fixtures'],
 	array_merge($claimed_files, $auxiliary_files),

@@ -20,7 +20,7 @@ docker compose -p "$PROJECT" up -d --build
 database_ready=false
 
 for _ in $(seq 1 36); do
-	if docker compose -p "$PROJECT" exec -T db mariadb-admin ping -h 127.0.0.1 -ucacti -pmactrack-test --silent; then
+	if docker compose -p "$PROJECT" exec -T db mysqladmin ping -h 127.0.0.1 -ucacti -pmactrack-test --silent; then
 		database_ready=true
 		break
 	fi

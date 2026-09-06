@@ -12,6 +12,11 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../../../../include/cli_check.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 
+if (!defined('MESSAGE_LEVEL_ERROR') || MESSAGE_LEVEL_ERROR !== 3) {
+	fwrite(STDERR, "Unexpected Cacti MESSAGE_LEVEL_ERROR contract\n");
+	exit(1);
+}
+
 foreach (['db_column_exists', 'db_index_exists'] as $helper) {
 	if (!function_exists($helper)) {
 		fwrite(STDERR, "Pinned Cacti core is missing required database helper: $helper\n");

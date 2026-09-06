@@ -45,7 +45,13 @@ function plugin_mactrack_install() {
 	api_plugin_register_realm('mactrack', 'mactrack_view_ips.php,mactrack_view_arp.php,mactrack_view_macs.php,mactrack_view_dot1x.php,mactrack_view_sites.php,mactrack_view_devices.php,mactrack_view_interfaces.php,mactrack_view_graphs.php,mactrack_ajax.php', 'Mactrack Viewer', 1);
 	api_plugin_register_realm('mactrack', 'mactrack_ajax_admin.php,mactrack_devices.php,mactrack_snmp.php,mactrack_sites.php,mactrack_device_types.php,mactrack_utilities.php,mactrack_macwatch.php,mactrack_macauth.php,mactrack_vendormacs.php', 'Mactrack Administrator', 1);
 
-	mactrack_setup_table_new();
+	$site_ready = mactrack_setup_table_new();
+
+	if (!$site_ready && PHP_SAPI === 'cli') {
+		fwrite(STDERR, "WARNING: MacTrack installed without a Default site; review the Cacti log. The poller will retry with backoff.\n");
+	}
+
+	return $site_ready;
 }
 
 function plugin_mactrack_uninstall() {
@@ -151,15 +157,18 @@ function mactrack_check_upgrade() {
 
 		// update the plugin information
 		$info = plugin_mactrack_version();
-		$id   = db_fetch_cell("SELECT id FROM plugin_config WHERE directory='mactrack'");
+		$id   = db_fetch_cell_prepared('SELECT id FROM plugin_config WHERE directory = ?', ['mactrack']);
 
-		db_execute("UPDATE plugin_config
-			SET name='" . $info['longname'] . "',
-			author='" . $info['author'] . "',
-			webpage='" . $info['homepage'] . "',
-			version='" . $info['version'] . "'
-			WHERE id='$id'");
+		db_execute_prepared('UPDATE plugin_config
+			SET name = ?,
+			author = ?,
+			webpage = ?,
+			version = ?
+			WHERE id = ?',
+			[$info['longname'], $info['author'], $info['homepage'], $info['version'], $id]);
 	}
+
+	mactrack_retry_default_site();
 }
 
 function mactrack_db_table_exists($table) {
@@ -251,7 +260,8 @@ function mactrack_setup_table_new() {
 
 	include_once($config['base_path'] . '/plugins/mactrack/includes/database.php');
 
-	mactrack_setup_database();
+	mactrack_reset_default_site_retry();
+	return mactrack_setup_database(PHP_SAPI !== 'cli');
 }
 
 function mactrack_page_head() {

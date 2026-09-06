@@ -19,6 +19,15 @@ sed -i \
 
 test -f "$CACTI_PATH/plugins/mactrack/vendor/autoload.php"
 
+# Import through a SQL client so client-side directives in cacti.sql work on
+# both MariaDB and MySQL. The database container's init-file path sends the
+# file directly to MySQL and cannot interpret DELIMITER.
+MYSQL_PWD="$DB_PASS" mysql \
+	--host="$DB_HOST" \
+	--port="$DB_PORT" \
+	--user="$DB_USER" \
+	"$DB_NAME" < "$CACTI_PATH/cacti.sql"
+
 # The plugin lifecycle does not need Cacti's optional device-template imports.
 # Explicitly skip them to keep this disposable install focused and fast enough
 # for CI while preserving the normal core install and plugin-management paths.
@@ -30,7 +39,7 @@ done
 php "$CACTI_PATH/cli/install_cacti.php" --accept-eula --install --force "${template_args[@]}"
 php "$CACTI_PATH/cli/plugin_manage.php" --plugin=mactrack --install --enable --allperms
 
-for destructive_test in mactrack_scanning_functions.php mactrack_schema_idempotency.php; do
+for destructive_test in mactrack_scanning_functions.php mactrack_schema_idempotency.php mactrack_concurrent_default_site.php; do
 	if MACTRACK_E2E=1 DB_NAME=cacti php "$CACTI_PATH/plugins/mactrack/tests/e2e/$destructive_test" >/dev/null 2>&1; then
 		guard_status=0
 	else
@@ -45,4 +54,5 @@ done
 
 MACTRACK_E2E=1 php "$CACTI_PATH/plugins/mactrack/tests/e2e/mactrack_scanning_functions.php"
 MACTRACK_E2E=1 php "$CACTI_PATH/plugins/mactrack/tests/e2e/mactrack_schema_idempotency.php"
+MACTRACK_E2E=1 php "$CACTI_PATH/plugins/mactrack/tests/e2e/mactrack_concurrent_default_site.php"
 php "$CACTI_PATH/plugins/mactrack/tests/e2e/mactrack_smoke.php"

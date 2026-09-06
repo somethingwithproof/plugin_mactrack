@@ -13,6 +13,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../Support/StandaloneTest.php';
+require_once __DIR__ . '/../Support/ProcessRunner.php';
 
 function api_plugin_register_hook() {
 }
@@ -21,14 +22,15 @@ function api_plugin_register_realm() {
 }
 
 function api_plugin_is_enabled() {
-	return false;
+	return true;
 }
 
 function api_plugin_enable_hooks() {
+	$GLOBALS['__test_enable_hooks_calls']++;
 }
 
 function get_current_page() {
-	return 'plugins.php';
+	return $GLOBALS['__test_current_page'] ?? 'plugins.php';
 }
 
 $root = realpath(__DIR__ . '/../..');
@@ -40,11 +42,30 @@ $config = ['base_path' => $fixture_root];
 require_once $root . '/setup.php';
 
 $GLOBALS['database_default'] = 'mactrack_unit';
-$GLOBALS['__test_db_fetch_cell_prepared'] = function () {
-	return '0';
+$GLOBALS['__test_enable_hooks_calls'] = 0;
+$unit_site_exists = false;
+$unit_insert_allowed = false;
+$GLOBALS['__test_db_fetch_cell_prepared'] = function ($sql) use (&$unit_site_exists) {
+	if (strpos($sql, 'GET_LOCK') !== false || strpos($sql, 'RELEASE_LOCK') !== false) {
+		return '1';
+	}
+
+	if (strpos($sql, 'plugin_config') !== false) {
+		return '';
+	}
+
+	return $unit_site_exists ? '1' : '0';
 };
-$GLOBALS['__test_db_execute_prepared'] = function () {
-	return false;
+$GLOBALS['__test_db_execute_prepared'] = function ($sql) use (&$unit_site_exists, &$unit_insert_allowed) {
+	if (strpos($sql, 'INTO mac_track_sites') !== false) {
+		if ($unit_insert_allowed) {
+			$unit_site_exists = true;
+		}
+
+		return $unit_insert_allowed;
+	}
+
+	return true;
 };
 $GLOBALS['__test_db_fetch_assoc'] = function ($sql) {
 	if (strpos($sql, 'SHOW COLUMNS FROM mac_track_ips') !== false) {
@@ -54,13 +75,146 @@ $GLOBALS['__test_db_fetch_assoc'] = function ($sql) {
 	return [];
 };
 
-MactrackStandaloneTest::assertSame(false, plugin_mactrack_install(), 'plugin installation returns a failed Default-site seed to the CLI caller');
+if (($argv[1] ?? '') === 'cli-install-failure-child') {
+	$installed = plugin_mactrack_install();
+	unlink($fixture_root . '/plugins/mactrack');
+	rmdir($fixture_root . '/plugins');
+	rmdir($fixture_root);
+	exit($installed ? 0 : 1);
+}
+
+$cli_install_result = MactrackProcessRunner::run([PHP_BINARY, __FILE__, 'cli-install-failure-child']);
+MactrackStandaloneTest::assertTrue($cli_install_result['status'] !== 0, 'a failed CLI install exits non-zero');
+MactrackStandaloneTest::assertContains('installed without a Default site', $cli_install_result['error'], 'a failed CLI install writes an actionable error to stderr');
+MactrackStandaloneTest::assertSame(false, mactrack_setup_table_new(), 'the setup hook returns a failed Default-site postcondition without throwing');
 MactrackStandaloneTest::assertSame([], $GLOBALS['__test_messages'], 'CLI installation does not attempt a web message');
 
 $GLOBALS['__test_messages'] = [];
-mactrack_check_upgrade();
+$unit_insert_allowed = true;
+MactrackStandaloneTest::assertSame(null, mactrack_check_upgrade(), 'the legacy upgrade lifecycle retains its void contract');
+MactrackStandaloneTest::assertSame(1, $GLOBALS['__test_enable_hooks_calls'], 'a seed diagnostic does not redefine the whole-schema hook lifecycle');
 MactrackStandaloneTest::assertSame([], $GLOBALS['__test_messages'], 'the CLI upgrade path does not attempt a web message');
-MactrackStandaloneTest::assertTrue(count($GLOBALS['__test_logs']) >= 2, 'the CLI install and upgrade failures are recorded in the Cacti log');
+MactrackStandaloneTest::assertTrue(count($GLOBALS['__test_logs']) >= 1, 'the CLI install failure is recorded in the Cacti log');
+$plugin_updates = array_filter($GLOBALS['__test_db_calls'], function ($call) {
+	return $call['fn'] === 'db_execute_prepared' && strpos($call['sql'], 'UPDATE plugin_config') !== false;
+});
+MactrackStandaloneTest::assertSame(1, count($plugin_updates), 'a seed diagnostic does not force repeated legacy migrations by withholding the version stamp');
+$info = plugin_mactrack_version();
+$plugin_update = reset($plugin_updates);
+MactrackStandaloneTest::assertSame(
+	[$info['longname'], $info['author'], $info['homepage'], $info['version'], ''],
+	$plugin_update['params'],
+	'the prepared plugin metadata update binds the prior values in column order'
+);
+MactrackStandaloneTest::assertSame('off', $GLOBALS['__test_config']['mt_default_site_seed_pending'], 'a later successful lifecycle clears the focused retry marker');
+
+$GLOBALS['__test_db_fetch_row'] = function () use ($info) {
+	return ['version' => $info['version'], 'status' => 1];
+};
+$unit_site_exists = false;
+$unit_insert_allowed = false;
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
+$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '1';
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
+$inserts_before_retry = count(array_filter($GLOBALS['__test_db_calls'], function ($call) {
+	return $call['fn'] === 'db_execute_prepared' && strpos($call['sql'], 'INTO mac_track_sites') !== false;
+}));
+mactrack_check_upgrade();
+$inserts_after_retry = count(array_filter($GLOBALS['__test_db_calls'], function ($call) {
+	return $call['fn'] === 'db_execute_prepared' && strpos($call['sql'], 'INTO mac_track_sites') !== false;
+}));
+$plugin_updates_after_retry = array_filter($GLOBALS['__test_db_calls'], function ($call) {
+	return $call['fn'] === 'db_execute_prepared' && strpos($call['sql'], 'UPDATE plugin_config') !== false;
+});
+MactrackStandaloneTest::assertTrue($inserts_after_retry > $inserts_before_retry, 'a pending seed retries after the plugin version is current');
+MactrackStandaloneTest::assertSame(1, count($plugin_updates_after_retry), 'a seed-only retry does not rerun or restamp the legacy migration');
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
+$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '1';
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
+$forced_pending_reads = 0;
+$GLOBALS['__test_read_config_option'] = function ($name, $force) use (&$forced_pending_reads) {
+	if ($name === 'mt_default_site_seed_pending' && !$force) {
+		return 'off';
+	}
+
+	if ($name === 'mt_default_site_seed_pending' && $force) {
+		$forced_pending_reads++;
+	}
+
+	return $GLOBALS['__test_config'][$name] ?? '';
+};
+$inserts_before_stale_cache_check = count(array_filter($GLOBALS['__test_db_calls'], function ($call) {
+	return $call['fn'] === 'db_execute_prepared' && strpos($call['sql'], 'INTO mac_track_sites') !== false;
+}));
+mactrack_check_upgrade();
+$inserts_after_stale_cache_check = count(array_filter($GLOBALS['__test_db_calls'], function ($call) {
+	return $call['fn'] === 'db_execute_prepared' && strpos($call['sql'], 'INTO mac_track_sites') !== false;
+}));
+MactrackStandaloneTest::assertTrue($forced_pending_reads > 0, 'the recovery path bypasses a stale session-cached pending marker');
+MactrackStandaloneTest::assertTrue($inserts_after_stale_cache_check > $inserts_before_stale_cache_check, 'a stale cached off value cannot suppress a due retry');
+$GLOBALS['__test_read_config_option'] = null;
+$retry_queries = 0;
+$GLOBALS['__test_db_fetch_cell_prepared'] = function () use (&$retry_queries) {
+	$retry_queries++;
+
+	return '1';
+};
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
+$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '2';
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = (string) (time() + 300);
+mactrack_check_upgrade();
+MactrackStandaloneTest::assertSame(0, $retry_queries, 'a pending seed respects its next-retry backoff without touching the database');
+$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '5';
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
+mactrack_check_upgrade();
+MactrackStandaloneTest::assertSame(1, $retry_queries, 'a degraded seed resumes automatic recovery after its hourly window');
+MactrackStandaloneTest::assertSame('off', $GLOBALS['__test_config']['mt_default_site_seed_pending'], 'a successful degraded retry clears the pending marker');
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'off';
+$non_pending_site_queries = 0;
+$GLOBALS['__test_db_fetch_cell_prepared'] = function () use (&$non_pending_site_queries) {
+	$non_pending_site_queries++;
+
+	return '1';
+};
+$config_before_non_pending_check = $GLOBALS['__test_config'];
+$calls_before_non_pending_check = count($GLOBALS['__test_db_calls']);
+mactrack_check_upgrade();
+MactrackStandaloneTest::assertSame(0, $non_pending_site_queries, 'a non-pending current-version check does not acquire a lock or query the sites table');
+MactrackStandaloneTest::assertSame($calls_before_non_pending_check, count($GLOBALS['__test_db_calls']), 'a non-pending current-version check performs no insert or metadata write');
+MactrackStandaloneTest::assertSame($config_before_non_pending_check, $GLOBALS['__test_config'], 'a non-pending current-version check does not rewrite the retry marker');
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
+$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '0';
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
+$GLOBALS['__test_db_fetch_cell_prepared'] = function ($sql) {
+	if (strpos($sql, 'GET_LOCK') !== false || strpos($sql, 'RELEASE_LOCK') !== false) {
+		return '1';
+	}
+
+	return '0';
+};
+$GLOBALS['__test_db_execute_prepared'] = function ($sql) {
+	if (strpos($sql, 'INTO mac_track_sites') !== false) {
+		throw new RuntimeException('simulated plugin-page insert exception');
+	}
+
+	return true;
+};
+MactrackStandaloneTest::assertSame(null, mactrack_check_upgrade(), 'the plugin-management lifecycle survives a throwing Default-site insert');
+MactrackStandaloneTest::assertSame('1', $GLOBALS['__test_config']['mt_default_site_seed_attempts'], 'the surviving plugin page records its failed retry');
+$page_exception_log = end($GLOBALS['__test_logs']);
+MactrackStandaloneTest::assertContains('simulated plugin-page insert exception', $page_exception_log['message'], 'the surviving plugin page logs the swallowed exception');
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
+$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '5';
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
+$GLOBALS['__test_db_execute_prepared'] = function () {
+	return false;
+};
+MactrackStandaloneTest::assertSame(false, mactrack_setup_table_new(), 'an explicit failed setup remains recoverable without unwinding Cacti registration');
+MactrackStandaloneTest::assertSame('1', $GLOBALS['__test_config']['mt_default_site_seed_attempts'], 'an explicit setup resets an exhausted circuit and makes one fresh attempt');
+$GLOBALS['__test_current_page'] = 'plugin_manage.php';
+$calls_before_check_config = count($GLOBALS['__test_db_calls']);
+MactrackStandaloneTest::assertSame(true, plugin_mactrack_check_config(), 'Cacti check-config retains its dependency-only contract');
+MactrackStandaloneTest::assertSame($calls_before_check_config, count($GLOBALS['__test_db_calls']), 'check-config performs no database work outside the upgrade page guard');
 
 unlink($fixture_root . '/plugins/mactrack');
 rmdir($fixture_root . '/plugins');

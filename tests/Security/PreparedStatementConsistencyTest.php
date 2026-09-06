@@ -47,7 +47,7 @@ require_once __DIR__ . '/../Support/TrackedPhpFiles.php';
 		'mactrack_view_macs.php'        => 9,
 		'mactrack_view_sites.php'       => 3,
 		'poller_mactrack.php'           => 35,
-		'setup.php'                     => 22,
+		'setup.php'                     => 20,
 	];
 	$dynamic_baseline = [
 		'includes/database.php'         => 2,
@@ -74,7 +74,7 @@ require_once __DIR__ . '/../Support/TrackedPhpFiles.php';
 		'mactrack_view_ips.php'         => 2,
 		'mactrack_view_macs.php'        => 6,
 		'mactrack_view_sites.php'       => 3,
-		'setup.php'                     => 12,
+		'setup.php'                     => 11,
 	];
 	$dynamic_prepared_baseline = [
 		'mactrack_devices.php'  => 3,
@@ -115,31 +115,43 @@ require_once __DIR__ . '/../Support/TrackedPhpFiles.php';
 $matches_baseline = function ($actual, $baseline) {
 	return $actual === $baseline;
 };
+$baseline_diagnostic = function ($file, $actual, $baseline, $kind) {
+	if (!array_key_exists($file, $baseline)) {
+		return "$file introduced $kind DB calls without a reviewed baseline";
+	}
 
-MactrackStandaloneTest::assertTrue(!$matches_baseline(0, 1), 'a reduced SQL-debt count cannot bank baseline headroom');
+	if ($actual > $baseline[$file]) {
+		return "$file increased its $kind DB-call count to $actual; use a prepared call or explicitly review the baseline";
+	}
 
-foreach ($actual_raw as $file => $count) {
-	MactrackStandaloneTest::assertTrue(isset($raw_baseline[$file]), "$file introduced raw DB calls without a baseline");
-	MactrackStandaloneTest::assertTrue(isset($raw_baseline[$file]) && $matches_baseline($count, $raw_baseline[$file]), "$file raw DB-call count changed; update the baseline in the same reviewed change");
-}
+	if ($actual < $baseline[$file]) {
+		return "$file reduced its $kind DB-call count to $actual; lower the baseline in this commit";
+	}
 
-foreach ($actual_dynamic as $file => $count) {
-	MactrackStandaloneTest::assertTrue(isset($dynamic_baseline[$file]), "$file introduced dynamically-built raw SQL without a baseline");
-	MactrackStandaloneTest::assertTrue(isset($dynamic_baseline[$file]) && $matches_baseline($count, $dynamic_baseline[$file]), "$file dynamically-built raw SQL count changed; update the baseline in the same reviewed change");
-}
+	return null;
+};
 
-foreach ($actual_dynamic_prepared as $file => $count) {
-	MactrackStandaloneTest::assertTrue(isset($dynamic_prepared_baseline[$file]), "$file introduced dynamically-built prepared SQL without a baseline");
-	MactrackStandaloneTest::assertTrue(isset($dynamic_prepared_baseline[$file]) && $matches_baseline($count, $dynamic_prepared_baseline[$file]), "$file dynamically-built prepared SQL count changed; update the baseline in the same reviewed change");
-}
+MactrackStandaloneTest::assertTrue($matches_baseline(1, 1), 'the SQL-debt gate accepts an exact baseline');
+MactrackStandaloneTest::assertTrue(!$matches_baseline(0, 1), 'the SQL-debt gate requires a reduced count to lower its baseline');
+MactrackStandaloneTest::assertTrue(!$matches_baseline(2, 1), 'the SQL-debt gate rejects a known increase');
+$missing_baseline_message = $baseline_diagnostic('new-file.php', 1, [], 'raw');
+$reduced_baseline_message = $baseline_diagnostic('existing.php', 1, ['existing.php' => 2], 'raw');
+$increased_baseline_message = $baseline_diagnostic('existing.php', 3, ['existing.php' => 2], 'raw');
+MactrackStandaloneTest::assertContains('without a reviewed baseline', $missing_baseline_message, 'a raw DB call in a file without a baseline fails closed');
+MactrackStandaloneTest::assertContains('reduced its raw DB-call count to 1; lower the baseline', $reduced_baseline_message, 'a reduction tells the contributor to lower the baseline');
+MactrackStandaloneTest::assertContains('increased its raw DB-call count to 3', $increased_baseline_message, 'an increase is accurately identified');
 
 foreach ([
 	'raw' => [$raw_baseline, $actual_raw],
 	'dynamically-built raw' => [$dynamic_baseline, $actual_dynamic],
 	'dynamically-built prepared' => [$dynamic_prepared_baseline, $actual_dynamic_prepared],
 ] as $kind => $maps) {
-	foreach ($maps[0] as $file => $count) {
-		MactrackStandaloneTest::assertTrue(isset($maps[1][$file]), "$file has a stale $kind SQL baseline; delete the entry");
+	$files = array_values(array_unique(array_merge(array_keys($maps[0]), array_keys($maps[1]))));
+	sort($files);
+
+	foreach ($files as $file) {
+		$diagnostic = $baseline_diagnostic($file, $maps[1][$file] ?? 0, $maps[0], $kind);
+		MactrackStandaloneTest::assertSame(null, $diagnostic, $diagnostic ?? "$file exactly matches its $kind SQL baseline");
 	}
 }
 

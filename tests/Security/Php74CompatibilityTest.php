@@ -24,7 +24,7 @@ require_once __DIR__ . '/../Support/TrackedPhpFiles.php';
 $root = realpath(__DIR__ . '/../..');
 
 foreach (MactrackTrackedPhpFiles::listRelative($root) as $relative_file) {
-	if (preg_match('#(^|/)(tests|vendor)(/|$)#', $relative_file)) {
+	if (preg_match('#(^|/)vendor(/|$)#', $relative_file)) {
 		continue;
 	}
 
@@ -56,7 +56,12 @@ $expected_syntax = array_values(MactrackPhp74Scanner::forbiddenSyntaxTokens());
 $actual_syntax = MactrackPhp74Scanner::violations($syntax_fixture);
 sort($expected_syntax);
 sort($actual_syntax);
-MactrackStandaloneTest::assertSame($expected_syntax, $actual_syntax, 'the PHP 7.4 gate rejects every newer syntax token it tracks');
+
+if ($expected_syntax) {
+	MactrackStandaloneTest::assertSame($expected_syntax, $actual_syntax, 'the current tokenizer detects every newer syntax token it exposes');
+} else {
+	print "PHP 7.4 exposes no PHP 8 syntax tokens; its native parser negative control supplies this gate\n";
+}
 
 $fixture = tempnam(sys_get_temp_dir(), 'mactrack-php8-syntax-');
 MactrackStandaloneTest::assertTrue($fixture !== false, 'a parser negative-control fixture is allocated');

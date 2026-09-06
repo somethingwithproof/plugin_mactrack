@@ -9,9 +9,11 @@ name: MacTrack Test Suite
 on:
   push:
     branches:
+      - main
       - develop
   pull_request:
     branches:
+      - main
       - develop
 
 permissions:
@@ -34,13 +36,25 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
+          tools: composer:v2
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run cohesive fast suite
         run: php tests/run.php all
 
   docker-integration:
-    name: Clean Cacti install and schema
+    name: Clean Cacti install (${{ matrix.database.name }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+          - name: MariaDB 10.11
+            image: mariadb:10.11
+          - name: MySQL 8.0
+            image: mysql:8.0
     steps:
       - name: Checkout Cacti
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -69,4 +83,5 @@ jobs:
         env:
           CACTI_SOURCE: ${{ github.workspace }}/cacti
           MACTRACK_SOURCE: ${{ github.workspace }}/cacti/plugins/mactrack
+          DB_IMAGE: ${{ matrix.database.image }}
         run: bash cacti/plugins/mactrack/tests/e2e/run-mactrack-e2e.sh

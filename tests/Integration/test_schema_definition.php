@@ -18,8 +18,15 @@ require_once __DIR__ . '/../../includes/database.php';
 
 $manifest = require __DIR__ . '/../Support/SchemaManifest.php';
 
-$GLOBALS['__test_db_fetch_cell_prepared'] = function () {
-	return '0';
+$schema_site_checks = 0;
+$GLOBALS['__test_db_fetch_cell_prepared'] = function ($sql) use (&$schema_site_checks) {
+	if (strpos($sql, 'COUNT(*) FROM mac_track_sites') !== false) {
+		$schema_site_checks++;
+
+		return $schema_site_checks === 1 ? '0' : '1';
+	}
+
+	return '1';
 };
 mactrack_setup_database();
 
@@ -30,7 +37,17 @@ $expected    = $manifest['tables'];
 sort($actual);
 sort($expected);
 
-MactrackStandaloneTest::assertSame($expected, $actual, 'schema builder creates exactly the documented MacTrack tables');
+$schema_matches_manifest = function ($created, $documented) {
+	sort($created);
+	sort($documented);
+
+	return $created === $documented;
+};
+
+MactrackStandaloneTest::assertTrue($schema_matches_manifest($actual, $expected), 'schema builder creates exactly the documented MacTrack tables');
+$missing_table_fixture = $actual;
+array_pop($missing_table_fixture);
+MactrackStandaloneTest::assertTrue(!$schema_matches_manifest($missing_table_fixture, $expected), 'the schema manifest gate rejects a missing table');
 
 $site_table_event = null;
 $site_insert_event = null;

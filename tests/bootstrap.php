@@ -20,7 +20,9 @@ $GLOBALS['__test_config']                 = [];
 $GLOBALS['__test_db_calls']               = [];
 $GLOBALS['__test_db_execute_prepared']    = null;
 $GLOBALS['__test_db_fetch_assoc']         = null;
+$GLOBALS['__test_db_fetch_row']           = null;
 $GLOBALS['__test_db_fetch_cell_prepared'] = '';
+$GLOBALS['__test_read_config_option']      = null;
 $GLOBALS['__test_request']                = [];
 $GLOBALS['__test_table_definitions']      = [];
 $GLOBALS['__test_logs']                   = [];
@@ -64,6 +66,10 @@ if (!function_exists('db_fetch_assoc_prepared')) {
 
 if (!function_exists('db_fetch_row')) {
 	function db_fetch_row($sql) {
+		if (is_callable($GLOBALS['__test_db_fetch_row'])) {
+			return $GLOBALS['__test_db_fetch_row']($sql);
+		}
+
 		return [];
 	}
 }
@@ -137,6 +143,10 @@ if (!function_exists('api_plugin_db_table_create')) {
 
 if (!function_exists('read_config_option')) {
 	function read_config_option($name, $force = false) {
+		if (is_callable($GLOBALS['__test_read_config_option'])) {
+			return $GLOBALS['__test_read_config_option']($name, $force);
+		}
+
 		return $GLOBALS['__test_config'][$name] ?? '';
 	}
 }
@@ -264,5 +274,5 @@ if (!defined('POLLER_VERBOSITY_NONE')) {
 }
 
 if (!defined('MESSAGE_LEVEL_ERROR')) {
-	define('MESSAGE_LEVEL_ERROR', 1);
+	define('MESSAGE_LEVEL_ERROR', 3);
 }
