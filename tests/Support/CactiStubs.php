@@ -35,9 +35,15 @@ function db_qstr($value) {
 	return "''";
 }
 function read_config_option($name, $force = false) {
-	return '';
+	global $mactrack_test_config_options;
+
+	return $mactrack_test_config_options[$name] ?? '';
 }
 function set_config_option($name, $value) {
+	global $mactrack_test_config_options;
+
+	$mactrack_test_config_options[$name] = $value;
+
 	return true;
 }
 function get_request_var($name, $default = null) {

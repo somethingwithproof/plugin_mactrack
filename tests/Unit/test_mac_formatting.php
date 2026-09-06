@@ -7,7 +7,7 @@
  +-------------------------------------------------------------------------+
 */
 
-require_once __DIR__ . '/../../../../include/cli_check.php';
+require_once __DIR__ . '/../Support/CactiStubs.php';
 require_once __DIR__ . '/../../lib/mactrack_functions.php';
 
 $raw      = 'aabbccddeeff';
