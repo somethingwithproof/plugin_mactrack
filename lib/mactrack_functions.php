@@ -954,8 +954,8 @@ function build_InterfacesTable(&$device, &$ifIndexes, $getLinkPorts = false, $ge
 			(isset($ifHighSpeed[$ifIndex]) ? $ifHighSpeed[$ifIndex] : '') . "', '" .
 			(isset($ifDuplex[$ifIndex]) ? $ifDuplex[$ifIndex] : '') . "', " .
 			db_qstr($desc) . ", '" .
-			(isset($ifMtu[$ifIndex]) ? $ifMtu[$ifIndex] : '') . "', '" .
-			$mac_address . "', '" .
+			(isset($ifMtu[$ifIndex]) ? $ifMtu[$ifIndex] : '') . "', " .
+			db_qstr($mac_address) . ", '" .
 			(isset($ifAdminStatus[$ifIndex]) ? $ifAdminStatus[$ifIndex] : '') . "', '" .
 			(isset($ifOperStatus[$ifIndex]) ? $ifOperStatus[$ifIndex] : '') . "', '" .
 			(isset($ifLastChange[$ifIndex]) ? $ifLastChange[$ifIndex] : '') . "', '" .
@@ -2131,7 +2131,14 @@ function xform_mac_address($mac_address) {
 
 	// A six-byte SNMP OctetString is binary. Every byte, including whitespace
 	// and NUL values, is significant and must reach bin2hex() unchanged.
-	if (strlen($mac_address) !== 6) {
+	if (strlen($mac_address) === 6) {
+		// Some agents use an all-zero or all-whitespace OctetString to report
+		// that an interface has no hardware address. Do not store those sentinels
+		// as synthetic MAC addresses.
+		if ($mac_address === str_repeat("\0", 6) || trim($mac_address) === '') {
+			return '';
+		}
+	} else {
 		$mac_address = trim($mac_address);
 	}
 
@@ -2160,8 +2167,51 @@ function xform_mac_address($mac_address) {
 	}
 
 	$mac_address = str_replace(':', '', $mac_address);
+	$mac_address = strtoupper($mac_address);
 
-	return strtoupper($mac_address);
+	return preg_match('/^[0-9A-F]{12}$/D', $mac_address) === 1 ? $mac_address : '';
+}
+
+/**
+ * Preserve printable port-description punctuation used by switches while
+ * rejecting control characters and unbounded request values.
+ *
+ * @param mixed $value
+ * @return string
+ */
+function mactrack_sanitize_port_name_filter($value) {
+	$value = preg_replace('/[\x00-\x1F\x7F]/', '', (string) $value) ?? '';
+
+	return mb_strcut($value, 0, 255, 'UTF-8');
+}
+
+/**
+ * Build the parameterized port-name predicate used by viewer queries.
+ *
+ * @param string $column
+ * @param int    $filter_type
+ * @param string $value
+ * @return array
+ */
+function mactrack_port_name_filter_clause($column, $filter_type, $value) {
+	switch ((int) $filter_type) {
+		case 2:
+			return ["$column = ?", [$value]];
+		case 3:
+			return ["$column LIKE ?", ['%' . $value . '%']];
+		case 4:
+			return ["$column LIKE ?", [$value . '%']];
+		case 5:
+			return ["$column NOT LIKE ?", ['%' . $value . '%']];
+		case 6:
+			return ["$column NOT LIKE ?", [$value . '%']];
+		case 7:
+			return ["$column = ''", []];
+		case 8:
+			return ["$column != ''", []];
+		default:
+			return ['', []];
+	}
 }
 
 /**
@@ -2485,30 +2535,28 @@ function db_store_device_port_results(&$device, $port_array, $scan_date) {
 
 // db_check_auth - This function checks whether the mac address exists in the mac_track+macauth table
 function db_check_auth($mac_address) {
-	if ($mac_address === '') {
+	if ($mac_address === null || $mac_address === '') {
 		return false;
 	}
 
 	$query = db_fetch_cell_prepared('SELECT mac_id
 		FROM mac_track_macauth
-		WHERE mac_address
-		LIKE ?',
-		['%' . $mac_address . '%']);
+		WHERE mac_address = ?',
+		[$mac_address]);
 
 	return $query;
 }
 
 // db_check_for_ip - This function checks whether the mac address has a matching IP address in the mac_track_arp table
 function db_check_for_ip($mac_address) {
-	if ($mac_address === '') {
+	if ($mac_address === null || $mac_address === '') {
 		return false;
 	}
 
 	$query = db_fetch_cell_prepared('SELECT ip_address
 		FROM mac_track_arp
-		WHERE mac_address
-		LIKE ?',
-		['%' . $mac_address . '%']);
+		WHERE mac_address = ?',
+		[$mac_address]);
 
 	return $query;
 }

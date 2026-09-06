@@ -421,7 +421,7 @@ function get_h3c_3com_arp_table($site, &$device) {
 			// An empty MAC is the column default, so it must not be looked up.
 			$tmpmac = xform_mac_address($mac_address[$key] ?? '');
 
-			$port = $tmpmac !== '' ? db_fetch_cell_prepared('SELECT port_number FROM mac_track_ports 
+			$port = $tmpmac !== '' ? db_fetch_cell_prepared('SELECT port_number FROM mac_track_ports
 				WHERE mac_address=? ORDER BY scan_date DESC LIMIT 1', [$tmpmac]) : false;
 
 			if ($port) {
