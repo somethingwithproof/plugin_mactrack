@@ -40,7 +40,13 @@ test('ASCII and HEX- forms strip delimiters', function ($input) {
 
 test('binary hex bytes convert to an uppercase hex string', function () {
 	expect(xform_mac_address(hex2bin('aabbccddeeff')))->toBe('AABBCCDDEEFF');
-	expect(xform_mac_address(hex2bin('aabbccddee00')))->toBe('AABBCCDDEE00');
+
+	foreach (['00', '09', '0a', '0b', '0d', '20'] as $boundaryByte) {
+		expect(xform_mac_address(hex2bin($boundaryByte . 'aabbccddee')))->toBe(strtoupper($boundaryByte . 'aabbccddee'));
+		expect(xform_mac_address(hex2bin('aabbccddee' . $boundaryByte)))->toBe(strtoupper('aabbccddee' . $boundaryByte));
+	}
+
+	expect(xform_mac_address(hex2bin('20090a0d0b20')))->toBe('20090A0D0B20');
 });
 
 test('the transformed value is returned, not the trimmed input', function () {

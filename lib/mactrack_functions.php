@@ -490,7 +490,7 @@ function get_standard_arp_table($site, &$device) {
 	if (cacti_sizeof($atEntries)) {
 		foreach ($atEntries as $atEntry) {
 			// check the mac_track_arp table if no IP address is found
-			if ($atEntry['atNetAddress'] == '') {
+			if ($atEntry['atNetAddress'] == '' && $atEntry['atPhysAddress'] !== '') {
 				$atEntry['atNetAddress'] = db_check_for_ip($atEntry['atPhysAddress']);
 				mactrack_debug('atNetAddress ****:' . $atEntry['atPhysAddress'] . '(' . $atEntry['atNetAddress'] . ')');
 			}
@@ -2127,9 +2127,13 @@ function xform_net_address($ip_address) {
  * @param mixed $mac_address
  */
 function xform_mac_address($mac_address) {
-	// Preserve NUL octets from binary SNMP values; the default trim() mask
-	// includes "\0", which can silently drop a significant final MAC byte.
-	$mac_address = trim((string) $mac_address, " \t\n\r\x0B");
+	$mac_address = (string) $mac_address;
+
+	// A six-byte SNMP OctetString is binary. Every byte, including whitespace
+	// and NUL values, is significant and must reach bin2hex() unchanged.
+	if (strlen($mac_address) !== 6) {
+		$mac_address = trim($mac_address);
+	}
 
 	// An interface with no hardware address stores an empty string, not the
 	// placeholder the dead branch below used to build and throw away.
@@ -2481,6 +2485,10 @@ function db_store_device_port_results(&$device, $port_array, $scan_date) {
 
 // db_check_auth - This function checks whether the mac address exists in the mac_track+macauth table
 function db_check_auth($mac_address) {
+	if ($mac_address === '') {
+		return false;
+	}
+
 	$query = db_fetch_cell_prepared('SELECT mac_id
 		FROM mac_track_macauth
 		WHERE mac_address
@@ -2492,6 +2500,10 @@ function db_check_auth($mac_address) {
 
 // db_check_for_ip - This function checks whether the mac address has a matching IP address in the mac_track_arp table
 function db_check_for_ip($mac_address) {
+	if ($mac_address === '') {
+		return false;
+	}
+
 	$query = db_fetch_cell_prepared('SELECT ip_address
 		FROM mac_track_arp
 		WHERE mac_address

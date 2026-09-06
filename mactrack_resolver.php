@@ -213,10 +213,6 @@ while (1) {
 					// answer section, so the record cannot be dereferenced blind.
 					$dns_hostname = isset($resp->answer[0]->ptrdname) ? $resp->answer[0]->ptrdname : '';
 				} catch (Net_DNS2_Exception $e) {
-					$dns_hostname = '';
-				}
-
-				if ($dns_hostname == '') {
 					$dns_hostname = gethostbyaddr($unresolved_ip['ip_address']);
 				}
 			} else {
