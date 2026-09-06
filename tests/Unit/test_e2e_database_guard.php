@@ -25,13 +25,17 @@ MactrackStandaloneTest::assertTrue($compose !== false, 'the E2E Compose definiti
 MactrackStandaloneTest::assertContains(': "${DB_USER:=cacti}"', $runner, 'the E2E runner defines the same default database user as Compose');
 MactrackStandaloneTest::assertContains(': "${DB_PASSWORD:=mactrack-test}"', $runner, 'the E2E runner defines the same default database password as Compose');
 MactrackStandaloneTest::assertContains('-e MYSQL_PWD="$DB_PASSWORD"', $runner, 'the readiness probe passes the overridden password without exposing it as an argument');
-MactrackStandaloneTest::assertContains('--user="$DB_USER" --silent', $runner, 'the readiness probe honors the database user override');
+MactrackStandaloneTest::assertContains('--user="$DB_USER"', $runner, 'the readiness probe honors the database user override');
+MactrackStandaloneTest::assertContains("--execute='SELECT 1'", $runner, 'the readiness probe verifies authenticated query access rather than accepting an access-denied ping');
 MactrackStandaloneTest::assertContains("\$database_default  = getenv('DB_NAME');", $bootstrap, 'the generated Cacti config reads the database name without source interpolation');
 MactrackStandaloneTest::assertContains("\$database_username = getenv('DB_USER');", $bootstrap, 'the generated Cacti config reads the database user without source interpolation');
 MactrackStandaloneTest::assertContains("\$database_password = getenv('DB_PASS');", $bootstrap, 'the generated Cacti config reads the database password without source interpolation');
 MactrackStandaloneTest::assertTrue(strpos($runner, '--password=') === false, 'the E2E runner does not expose the database password as a process argument');
-MactrackStandaloneTest::assertContains('MYSQL_PWD: ${DB_PASSWORD:-mactrack-test}', $compose, 'the database healthcheck receives the overridden password through its environment');
-MactrackStandaloneTest::assertContains('--user="$${MYSQL_USER}" --silent', $compose, 'the database healthcheck uses the overridden user without embedding the password');
+MactrackStandaloneTest::assertContains('MYSQL_PWD="$${MYSQL_PASSWORD}" mysql --protocol=tcp', $compose, 'the database healthcheck scopes the overridden password to an authenticated client query');
+MactrackStandaloneTest::assertContains('--execute="SELECT 1"', $compose, 'the Compose healthcheck cannot succeed before the configured application user exists');
+MactrackStandaloneTest::assertContains('--transaction-isolation=READ-COMMITTED', $compose, 'the database matrix pins the concurrency check to READ COMMITTED');
+MactrackStandaloneTest::assertTrue(strpos($compose, '      MYSQL_PWD:') === false, 'the database password is not exported globally where it can disrupt the MySQL entrypoint');
+MactrackStandaloneTest::assertContains('--user="$${MYSQL_USER}"', $compose, 'the database healthcheck uses the overridden user without embedding the password');
 MactrackStandaloneTest::assertTrue(strpos($compose, '-p${DB_PASSWORD') === false, 'the Compose healthcheck does not embed the password in its command');
 
 foreach (['mactrack_scanning_functions.php', 'mactrack_schema_idempotency.php', 'mactrack_concurrent_default_site.php'] as $destructive_test) {

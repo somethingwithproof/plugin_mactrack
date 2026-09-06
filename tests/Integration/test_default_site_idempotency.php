@@ -180,6 +180,7 @@ sort($expected_after_seed_exception);
 MactrackStandaloneTest::assertSame($expected_after_seed_exception, $created_after_seed_exception, 'a setup seed exception leaves the complete 22-table schema installed');
 MactrackStandaloneTest::assertSame(1, count($GLOBALS['__test_messages']), 'an active web-style install reports its first seed failure immediately');
 MactrackStandaloneTest::assertSame('mactrack_default_site_seed_failed', $GLOBALS['__test_messages'][0]['id'], 'the active install uses the stable Default-site message id');
+MactrackStandaloneTest::assertTrue(strpos($GLOBALS['__test_messages'][0]['text'], 'after repeated attempts') === false, 'the first-attempt operator message does not claim that retries were exhausted');
 $GLOBALS['__test_db_execute_prepared'] = $execute_prepared;
 $GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '0';
 $GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
@@ -273,12 +274,25 @@ MactrackStandaloneTest::assertSame('1', $GLOBALS['__test_config']['mt_default_si
 $first_retry_delay = (int) $GLOBALS['__test_config']['mt_default_site_seed_next_retry'] - time();
 MactrackStandaloneTest::assertTrue($first_retry_delay >= 50 && $first_retry_delay <= 60, 'the first failure schedules the 60-second retry window');
 $queries_before_web_notice = count($queries);
+$calls_before_web_notice = count($GLOBALS['__test_db_calls']);
 MactrackStandaloneTest::assertSame(false, mactrack_ensure_default_site(true), 'the first web path after a CLI failure reports safely during backoff');
-MactrackStandaloneTest::assertSame($queries_before_web_notice, count($queries), 'the first web notification does not bypass the active backoff');
+MactrackStandaloneTest::assertSame($queries_before_web_notice + 1, count($queries), 'the backoff path performs one read-only site check');
+MactrackStandaloneTest::assertSame($calls_before_web_notice, count($GLOBALS['__test_db_calls']), 'the backoff path performs no lock or insert');
 MactrackStandaloneTest::assertSame('on', $GLOBALS['__test_config']['mt_default_site_seed_pending'], 'failed assurance leaves the focused seed retry marker set');
 MactrackStandaloneTest::assertSame([], $GLOBALS['__test_messages'], 'the web path suppresses the banner while transient retries remain');
 MactrackStandaloneTest::assertSame(false, mactrack_ensure_default_site(true), 'a repeated request in the same backoff window remains lifecycle-safe');
 MactrackStandaloneTest::assertSame('1', $GLOBALS['__test_config']['mt_default_site_seed_attempts'], 'a repeated request in the same backoff window does not consume another attempt');
+
+$sites = [['site_name' => 'Recovered', 'site_info' => 'Added by another request']];
+$calls_before_external_recovery = count($GLOBALS['__test_db_calls']);
+MactrackStandaloneTest::assertSame(true, mactrack_retry_default_site(), 'the poller path detects a site added during an active backoff');
+MactrackStandaloneTest::assertSame($calls_before_external_recovery, count($GLOBALS['__test_db_calls']), 'external recovery clears backoff without taking a lock or inserting');
+MactrackStandaloneTest::assertSame('off', $GLOBALS['__test_config']['mt_default_site_seed_pending'], 'external recovery clears the pending marker immediately');
+MactrackStandaloneTest::assertSame([], $GLOBALS['__test_messages'], 'external recovery raises no false failure message');
+$sites = [];
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
+$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '1';
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
 
 foreach ([2 => 300, 3 => 900, 4 => 1800, 5 => 3600] as $expected_attempt => $expected_delay) {
 	$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
@@ -292,9 +306,12 @@ foreach ([2 => 300, 3 => 900, 4 => 1800, 5 => 3600] as $expected_attempt => $exp
 MactrackStandaloneTest::assertSame(1, count($GLOBALS['__test_messages']), 'the fifth failed window raises the repeated-failure operator message');
 MactrackStandaloneTest::assertSame('mactrack_default_site_seed_failed', $GLOBALS['__test_messages'][0]['id'], 'the repeated-failure path uses the stable Default-site message id');
 MactrackStandaloneTest::assertSame(3, $GLOBALS['__test_messages'][0]['level'], 'the repeated-failure path uses Cacti MESSAGE_LEVEL_ERROR');
+MactrackStandaloneTest::assertContains('after repeated attempts', $GLOBALS['__test_messages'][0]['text'], 'the exhausted retry path accurately identifies repeated failures');
 $queries_before_capped_retry = count($queries);
+$calls_before_capped_retry = count($GLOBALS['__test_db_calls']);
 MactrackStandaloneTest::assertSame(false, mactrack_ensure_default_site(true), 'the degraded state remains lifecycle-safe during its hourly backoff');
-MactrackStandaloneTest::assertSame($queries_before_capped_retry, count($queries), 'the degraded hourly backoff does not touch the database early');
+MactrackStandaloneTest::assertSame($queries_before_capped_retry + 1, count($queries), 'the degraded hourly backoff performs only its recovery check');
+MactrackStandaloneTest::assertSame($calls_before_capped_retry, count($GLOBALS['__test_db_calls']), 'the degraded hourly backoff performs no lock or insert early');
 MactrackStandaloneTest::assertSame(2, count($GLOBALS['__test_messages']), 'the degraded state remains operator-visible on later web requests');
 $insert_result = true;
 $GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';

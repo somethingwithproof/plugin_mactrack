@@ -83,6 +83,38 @@ if (($argv[1] ?? '') === 'cli-install-failure-child') {
 	exit($installed ? 0 : 1);
 }
 
+if (($argv[1] ?? '') === 'upgrade-reentry-child') {
+	$GLOBALS['__test_db_fetch_row'] = function () {
+		return ['version' => '0.0.0', 'status' => 1];
+	};
+	$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
+	$GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '2';
+	$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
+	$GLOBALS['__test_db_fetch_cell_prepared'] = function ($sql) {
+		if (strpos($sql, 'GET_LOCK') !== false || strpos($sql, 'RELEASE_LOCK') !== false) {
+			return '1';
+		}
+
+		return strpos($sql, 'plugin_config') !== false ? '1' : '0';
+	};
+	$GLOBALS['__test_db_execute_prepared'] = function ($sql) {
+		if (strpos($sql, 'INTO mac_track_sites') !== false || strpos($sql, 'UPDATE plugin_config') !== false) {
+			return false;
+		}
+
+		return true;
+	};
+	mactrack_check_upgrade();
+	$first_attempts = $GLOBALS['__test_config']['mt_default_site_seed_attempts'];
+	$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
+	mactrack_check_upgrade();
+	echo $first_attempts . ':' . $GLOBALS['__test_config']['mt_default_site_seed_attempts'];
+	unlink($fixture_root . '/plugins/mactrack');
+	rmdir($fixture_root . '/plugins');
+	rmdir($fixture_root);
+	exit(0);
+}
+
 $cli_install_result = MactrackProcessRunner::run([PHP_BINARY, __FILE__, 'cli-install-failure-child']);
 MactrackStandaloneTest::assertTrue($cli_install_result['status'] !== 0, 'a failed CLI install exits non-zero');
 MactrackStandaloneTest::assertContains('installed without a Default site', $cli_install_result['error'], 'a failed CLI install writes an actionable error to stderr');
@@ -91,6 +123,7 @@ MactrackStandaloneTest::assertSame([], $GLOBALS['__test_messages'], 'CLI install
 
 $GLOBALS['__test_messages'] = [];
 $unit_insert_allowed = true;
+$GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
 MactrackStandaloneTest::assertSame(null, mactrack_check_upgrade(), 'the legacy upgrade lifecycle retains its void contract');
 MactrackStandaloneTest::assertSame(1, $GLOBALS['__test_enable_hooks_calls'], 'a seed diagnostic does not redefine the whole-schema hook lifecycle');
 MactrackStandaloneTest::assertSame([], $GLOBALS['__test_messages'], 'the CLI upgrade path does not attempt a web message');
@@ -163,11 +196,14 @@ $GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
 $GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '2';
 $GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = (string) (time() + 300);
 mactrack_check_upgrade();
-MactrackStandaloneTest::assertSame(0, $retry_queries, 'a pending seed respects its next-retry backoff without touching the database');
+MactrackStandaloneTest::assertSame(1, $retry_queries, 'a pending seed uses one read-only check to detect external recovery during backoff');
+MactrackStandaloneTest::assertSame('off', $GLOBALS['__test_config']['mt_default_site_seed_pending'], 'a site found during backoff clears the stale pending marker');
+MactrackStandaloneTest::assertSame([], $GLOBALS['__test_messages'], 'external recovery during backoff raises no false operator error');
+$GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'on';
 $GLOBALS['__test_config']['mt_default_site_seed_attempts'] = '5';
 $GLOBALS['__test_config']['mt_default_site_seed_next_retry'] = '0';
 mactrack_check_upgrade();
-MactrackStandaloneTest::assertSame(1, $retry_queries, 'a degraded seed resumes automatic recovery after its hourly window');
+MactrackStandaloneTest::assertSame(2, $retry_queries, 'a degraded seed resumes automatic recovery after its hourly window');
 MactrackStandaloneTest::assertSame('off', $GLOBALS['__test_config']['mt_default_site_seed_pending'], 'a successful degraded retry clears the pending marker');
 $GLOBALS['__test_config']['mt_default_site_seed_pending'] = 'off';
 $non_pending_site_queries = 0;
@@ -210,7 +246,22 @@ $GLOBALS['__test_db_execute_prepared'] = function () {
 	return false;
 };
 MactrackStandaloneTest::assertSame(false, mactrack_setup_table_new(), 'an explicit failed setup remains recoverable without unwinding Cacti registration');
-MactrackStandaloneTest::assertSame('1', $GLOBALS['__test_config']['mt_default_site_seed_attempts'], 'an explicit setup resets an exhausted circuit and makes one fresh attempt');
+MactrackStandaloneTest::assertSame('1', $GLOBALS['__test_config']['mt_default_site_seed_attempts'], 'an operator-initiated setup bypasses an exhausted circuit and makes a fresh attempt');
+
+$upgrade_reentry = MactrackProcessRunner::run([PHP_BINARY, __FILE__, 'upgrade-reentry-child']);
+MactrackStandaloneTest::assertSame(0, $upgrade_reentry['status'], 'a repeated failed upgrade remains lifecycle-safe');
+MactrackStandaloneTest::assertSame('3:4', $upgrade_reentry['output'], 'repeated failed upgrades preserve and increment the seed attempt count instead of resetting it');
+MactrackStandaloneTest::assertContains('installed without a Default site', $upgrade_reentry['error'], 'a CLI install during active seed backoff remains visible to the operator');
+
+$uninstall_calls_before = count($GLOBALS['__test_db_calls']);
+MactrackStandaloneTest::assertSame(true, plugin_mactrack_uninstall(), 'the uninstall hook retains its successful lifecycle contract');
+$uninstall_call = $GLOBALS['__test_db_calls'][$uninstall_calls_before];
+MactrackStandaloneTest::assertSame('db_execute_prepared', $uninstall_call['fn'], 'uninstall clears retry state with a prepared statement');
+MactrackStandaloneTest::assertSame(
+	['mt_default_site_seed_pending', 'mt_default_site_seed_attempts', 'mt_default_site_seed_next_retry'],
+	$uninstall_call['params'],
+	'uninstall removes all Default-site retry settings so reinstall starts cleanly'
+);
 $GLOBALS['__test_current_page'] = 'plugin_manage.php';
 $calls_before_check_config = count($GLOBALS['__test_db_calls']);
 MactrackStandaloneTest::assertSame(true, plugin_mactrack_check_config(), 'Cacti check-config retains its dependency-only contract');

@@ -773,6 +773,16 @@ function mactrack_reset_default_site_retry(): void {
 	set_config_option('mt_default_site_seed_next_retry', '0');
 }
 
+function mactrack_raise_default_site_error(int $attempts): void {
+	if ($attempts >= 5) {
+		$message = __('MacTrack could not initialize its Default site after repeated attempts. Review the Cacti log before continuing.', 'mactrack');
+	} else {
+		$message = __('MacTrack could not initialize its Default site. Review the Cacti log before continuing.', 'mactrack');
+	}
+
+	raise_message('mactrack_default_site_seed_failed', $message, MESSAGE_LEVEL_ERROR);
+}
+
 function mactrack_ensure_default_site(?bool $notify_operator = null, bool $notify_immediately = false): bool {
 	$notify_operator = $notify_operator ?? (PHP_SAPI !== 'cli');
 	$pending = read_config_option('mt_default_site_seed_pending', true) === 'on';
@@ -780,8 +790,17 @@ function mactrack_ensure_default_site(?bool $notify_operator = null, bool $notif
 	$next_retry = max(0, (int) read_config_option('mt_default_site_seed_next_retry', true));
 
 	if ($pending && $next_retry > time()) {
+		// Another request or an administrator may have repaired the site while
+		// this worker was throttled. Clear stale retry state without taking the
+		// seed lock or attempting another insert.
+		if (mactrack_site_configuration_exists()) {
+			mactrack_reset_default_site_retry();
+
+			return true;
+		}
+
 		if ($notify_operator && ($notify_immediately || $attempts >= 5)) {
-			raise_message('mactrack_default_site_seed_failed', __('MacTrack could not initialize its Default site after repeated attempts. Review the Cacti log before continuing.', 'mactrack'), MESSAGE_LEVEL_ERROR);
+			mactrack_raise_default_site_error($attempts);
 		}
 
 		return false;
@@ -808,7 +827,7 @@ function mactrack_ensure_default_site(?bool $notify_operator = null, bool $notif
 	set_config_option('mt_default_site_seed_next_retry', (string) (time() + $delay));
 
 	if ($notify_operator && ($notify_immediately || $attempts >= 5)) {
-		raise_message('mactrack_default_site_seed_failed', __('MacTrack could not initialize its Default site after repeated attempts. Review the Cacti log before continuing.', 'mactrack'), MESSAGE_LEVEL_ERROR);
+		mactrack_raise_default_site_error($attempts);
 	}
 
 	return false;

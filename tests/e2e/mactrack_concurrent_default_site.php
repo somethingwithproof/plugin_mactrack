@@ -31,6 +31,24 @@ if (($argv[1] ?? '') === 'worker') {
 	exit(mactrack_seed_default_site() ? 0 : 1);
 }
 
+$original_sites = db_fetch_assoc('SELECT * FROM mac_track_sites ORDER BY site_id');
+$restore_sites = function () use ($original_sites) {
+	db_execute('DELETE FROM mac_track_sites');
+
+	foreach ($original_sites as $site) {
+		$columns = array_keys($site);
+		$quoted_columns = array_map(function ($column) {
+			return '`' . str_replace('`', '``', $column) . '`';
+		}, $columns);
+		$placeholders = implode(', ', array_fill(0, count($columns), '?'));
+		db_execute_prepared(
+			'INSERT INTO mac_track_sites (' . implode(', ', $quoted_columns) . ') VALUES (' . $placeholders . ')',
+			array_values($site)
+		);
+	}
+};
+register_shutdown_function($restore_sites);
+
 db_execute('DELETE FROM mac_track_sites');
 
 $lock_name = 'mactrack.default.' . sha1((string) $database_default);

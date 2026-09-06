@@ -20,8 +20,9 @@ $contracts = [
 	'function plugin_mactrack_uninstall',
 	"parse_ini_file(\$config['base_path'] . '/plugins/mactrack/INFO', true)",
 	"return \$info['info']",
-	'mactrack_setup_table_new()',
+	'mactrack_setup_table_new($operator_initiated)',
 	"mactrack_setup_database(PHP_SAPI !== 'cli')",
+	'plugin_mactrack_install(false)',
 ];
 
 foreach ($contracts as $contract) {

@@ -22,7 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-function plugin_mactrack_install() {
+function plugin_mactrack_install($operator_initiated = true) {
 	api_plugin_register_hook('mactrack', 'top_header_tabs',       'mactrack_show_tab',             'setup.php');
 	api_plugin_register_hook('mactrack', 'top_graph_header_tabs', 'mactrack_show_tab',             'setup.php');
 	api_plugin_register_hook('mactrack', 'config_arrays',         'mactrack_config_arrays',        'setup.php');
@@ -45,7 +45,7 @@ function plugin_mactrack_install() {
 	api_plugin_register_realm('mactrack', 'mactrack_view_ips.php,mactrack_view_arp.php,mactrack_view_macs.php,mactrack_view_dot1x.php,mactrack_view_sites.php,mactrack_view_devices.php,mactrack_view_interfaces.php,mactrack_view_graphs.php,mactrack_ajax.php', 'Mactrack Viewer', 1);
 	api_plugin_register_realm('mactrack', 'mactrack_ajax_admin.php,mactrack_devices.php,mactrack_snmp.php,mactrack_sites.php,mactrack_device_types.php,mactrack_utilities.php,mactrack_macwatch.php,mactrack_macauth.php,mactrack_vendormacs.php', 'Mactrack Administrator', 1);
 
-	$site_ready = mactrack_setup_table_new();
+	$site_ready = mactrack_setup_table_new($operator_initiated);
 
 	if (!$site_ready && PHP_SAPI === 'cli') {
 		fwrite(STDERR, "WARNING: MacTrack installed without a Default site; review the Cacti log. The poller will retry with backoff.\n");
@@ -55,6 +55,11 @@ function plugin_mactrack_install() {
 }
 
 function plugin_mactrack_uninstall() {
+	db_execute_prepared(
+		'DELETE FROM settings WHERE name IN (?, ?, ?)',
+		['mt_default_site_seed_pending', 'mt_default_site_seed_attempts', 'mt_default_site_seed_next_retry']
+	);
+
 	return true;
 }
 
@@ -118,7 +123,7 @@ function mactrack_check_upgrade() {
 		// if the plugin is installed and/or active
 		if (!cacti_sizeof($old) || $old['status'] == 1 || $old['status'] == 4) {
 			// re-register the hooks
-			plugin_mactrack_install();
+			plugin_mactrack_install(false);
 
 			if (api_plugin_is_enabled('mactrack')) {
 				// may sound ridiculous, but enables new hooks
@@ -255,12 +260,17 @@ function mactrack_check_dependencies() {
 	return true;
 }
 
-function mactrack_setup_table_new() {
+function mactrack_setup_table_new($operator_initiated = true) {
 	global $config;
 
 	include_once($config['base_path'] . '/plugins/mactrack/includes/database.php');
 
-	mactrack_reset_default_site_retry();
+	// Preserve a prior failed seed's backoff when an incomplete upgrade causes
+	// Cacti to re-enter this hook on a later request.
+	if ($operator_initiated || read_config_option('mt_default_site_seed_pending', true) !== 'on') {
+		mactrack_reset_default_site_retry();
+	}
+
 	return mactrack_setup_database(PHP_SAPI !== 'cli');
 }
 

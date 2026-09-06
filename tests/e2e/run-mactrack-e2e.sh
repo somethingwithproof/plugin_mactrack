@@ -22,7 +22,7 @@ docker compose -p "$PROJECT" up -d --build
 database_ready=false
 
 for _ in $(seq 1 36); do
-	if docker compose -p "$PROJECT" exec -T -e MYSQL_PWD="$DB_PASSWORD" db mysqladmin ping -h 127.0.0.1 --user="$DB_USER" --silent; then
+	if docker compose -p "$PROJECT" exec -T -e MYSQL_PWD="$DB_PASSWORD" db mysql --protocol=tcp -h 127.0.0.1 --user="$DB_USER" --execute='SELECT 1' --silent; then
 		database_ready=true
 		break
 	fi

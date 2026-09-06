@@ -31,6 +31,10 @@ $before = db_fetch_cell_prepared(
 	'SELECT COUNT(*) FROM mac_track_sites WHERE site_name = ?',
 	['Default']
 );
+$default_site_id = db_fetch_cell_prepared(
+	'SELECT site_id FROM mac_track_sites WHERE site_name = ?',
+	['Default']
+);
 
 if ((int) $before !== 1) {
 	fwrite(STDERR, "Plugin install did not seed exactly one Default site (found $before)\n");
@@ -48,26 +52,35 @@ if ((int) $after !== (int) $before) {
 	exit(1);
 }
 
-db_execute_prepared(
-	'INSERT INTO mac_track_sites (site_name, site_info) VALUES (?, ?)',
-	['MacTrack E2E custom site', 'Default-site resurrection guard']
-);
-db_execute_prepared('DELETE FROM mac_track_sites WHERE site_name = ?', ['Default']);
-mactrack_setup_database();
-$resurrected = db_fetch_cell_prepared(
-	'SELECT COUNT(*) FROM mac_track_sites WHERE site_name = ?',
-	['Default']
-);
+db_execute('START TRANSACTION');
 
-db_execute_prepared('DELETE FROM mac_track_sites WHERE site_name = ?', ['MacTrack E2E custom site']);
-db_execute_prepared('DELETE FROM mac_track_sites WHERE site_name = ?', ['Default']);
-db_execute_prepared(
-	'INSERT INTO mac_track_sites (site_name, site_info) VALUES (?, ?)',
-	['Default', 'Default site']
-);
+try {
+	db_execute_prepared(
+		'INSERT INTO mac_track_sites (site_name, site_info) VALUES (?, ?)',
+		['MacTrack E2E custom site', 'Default-site resurrection guard']
+	);
+	db_execute_prepared('DELETE FROM mac_track_sites WHERE site_name = ?', ['Default']);
+	mactrack_setup_database();
+	$resurrected = db_fetch_cell_prepared(
+		'SELECT COUNT(*) FROM mac_track_sites WHERE site_name = ?',
+		['Default']
+	);
+} finally {
+	db_execute('ROLLBACK');
+}
 
 if ((int) $resurrected !== 0) {
 	fwrite(STDERR, "Schema setup resurrected the deleted Default site\n");
+	exit(1);
+}
+
+$restored_site_id = db_fetch_cell_prepared(
+	'SELECT site_id FROM mac_track_sites WHERE site_name = ?',
+	['Default']
+);
+
+if ((string) $restored_site_id !== (string) $default_site_id) {
+	fwrite(STDERR, "Schema idempotency check changed the Default site identity\n");
 	exit(1);
 }
 
