@@ -79,8 +79,10 @@ if ($cabletronSource                                                            
 $interfacesSource = file_get_contents(__DIR__ . '/../../mactrack_view_interfaces.php');
 
 if ($interfacesSource                         === false ||
-	strpos($interfacesSource, 'mactrack_get_ignore_ports_pattern()') === false ||
-	strpos($interfacesSource, 'db_qstr($match)') === false ||
+	strpos($interfacesSource, 'mactrack_get_ignore_ports_predicate($sql_params)') === false ||
+	strpos($interfacesSource, 'db_fetch_assoc_prepared($sql_query, $sql_params)') === false ||
+	strpos($interfacesSource, 'db_fetch_cell_prepared($rows_query_string, $sql_params)') === false ||
+	strpos($interfacesSource, 'db_qstr($match)') !== false ||
 	strpos($interfacesSource, 'db_qstr_rlike') !== false ||
 	strpos($interfacesSource, "intval(get_filter_request_var('bwusage'))") === false) {
 	fwrite(STDERR, "Interface filters must use safe RLIKE quoting and normalized numeric values\n");

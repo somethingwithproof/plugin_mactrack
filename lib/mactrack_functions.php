@@ -3841,7 +3841,11 @@ function mactrack_validate_ignore_ports_pattern($pattern) {
 	// changing valid pattern characters solely to construct a PCRE delimiter.
 	$validation_pattern = "\x01" . $pattern . "\x01";
 
-	if (strpos($pattern, "\x01") !== false || @preg_match($validation_pattern, '') === false) {
+	$stress_input = str_repeat('a', 255) . '!';
+
+	if (strpos($pattern, "\x01") !== false ||
+		@preg_match($validation_pattern, '')            === false ||
+		@preg_match($validation_pattern, $stress_input) === false) {
 		cacti_log('Invalid MacTrack Ports to Ignore regular expression; using the default pattern', false, 'MACTRACK');
 
 		return $default;
@@ -3861,4 +3865,12 @@ function mactrack_get_ignore_ports_pattern() {
 	}
 
 	return $pattern;
+}
+
+function mactrack_get_ignore_ports_predicate(&$params) {
+	$pattern  = mactrack_get_ignore_ports_pattern();
+	$params[] = $pattern;
+	$params[] = $pattern;
+
+	return '(ifName NOT RLIKE ? AND ifDescr NOT RLIKE ?)';
 }
