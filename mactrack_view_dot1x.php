@@ -164,7 +164,7 @@ function mactrack_view_export_dot1x() {
 	}
 }
 
-function mactrack_view_get_dot1x_records(&$sql_where, $apply_limits = true, $rows) {
+function mactrack_view_get_dot1x_records(&$sql_where, $apply_limits = true, $rows = false) {
 	// status sql where
 	if (get_request_var('status') == '1') { // Idle
 		$sql_where .= ($sql_where != '' ? ' AND ' : 'WHERE ') . 'mtd.status = 1';

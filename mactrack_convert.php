@@ -122,7 +122,7 @@ if (read_config_option('mt_collection_timing') != 'disabled') {
 	}
 }
 
-function mactrack_create_partitioned_table($engine = 'InnoDB', $charset, $collate, $days = 30, $migrate = false) {
+function mactrack_create_partitioned_table($engine, $charset, $collate, $days = 30, $migrate = false) {
 	global $config;
 
 	// rename the original table
